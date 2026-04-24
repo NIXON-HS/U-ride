@@ -61,16 +61,8 @@ Thumbs.db
 # 7. Testing (Supertest / Jest local states)
 .jest-test-results.json
 
-# 8. Archivos auxiliares de LaTeX
-Latex/*.aux
-Latex/*.fdb_latexmk
-Latex/*.fls
-Latex/*.log
-Latex/*.out
-Latex/*.synctex.gz
-Latex/*.toc
-Latex/*.bbl
-Latex/*.blg
-Latex/*.lof
-Latex/*.lot
-# Latex/*.pdf # Descomentar si no se desea versionar el PDF generado
+# 8. Documentación y LaTeX
+Latex/
+documentacion/
+TAREAS_URIDE.md/
+

@@ -99,33 +99,46 @@ El sistema U-Ride rige su lógica alrededor de exigencias de negocio de alta cri
 
 ## 🚀 Requisitos Previos e Instalación
 
-### 1. Variables de Entorno (`.env`)
-En el directorio raíz del back-end, clonar el fichero de ejemplo (`.env.example` si existiese) o crear el respectivo `.env`.
+### 1. Base de Datos y Variables de Entorno
+
+Asegúrate de tener **PostgreSQL** instalado y ejecutándose localmente. Crea una base de datos vacía llamada `uride` (o el nombre que prefieras).
+
+En el directorio raíz de `backend`, crea tu archivo `.env` con las credenciales de tu base de datos:
 ```bash
 PORT=5000
 DB_HOST=127.0.0.1
 DB_PORT=5432
-DB_USER=root
-DB_PASSWORD=secret
-DB_NAME=uride
+DB_USER=postgres    # Tu usuario de PostgreSQL
+DB_PASSWORD=secret  # Tu contraseña de PostgreSQL
+DB_NAME=uride       # Nombre de la base de datos que creaste
 JWT_SECRET=tu-llave-segura
 ```
 
-### 2. Arranque del Entorno (Desarrollo)
-El proyecto es un Monorepo estructurado por directorios. Exige levantar tres consolas para operación íntegra:
+### 2. Inicialización de la Base de Datos
+
+Antes de arrancar el sistema por primera vez, debes construir las tablas y crear el usuario administrador por defecto. Abre una consola, entra al backend e instala sus dependencias primero:
+```bash
+cd backend
+npm install
+node setupDB.js      # Ejecuta el script SQL para crear las tablas
+node createAdmin.js  # Crea el superusuario Administrador inicial
+```
+
+### 3. Arranque del Entorno (Desarrollo)
+
+El proyecto es un Monorepo estructurado por directorios. Exige levantar tres consolas independientes para operar todo el ecosistema al mismo tiempo:
 
 ```bash
-# Consola 1: Backend
+# Consola 1: Backend (API Gateway & Sockets)
 $ cd backend 
-$ npm install 
 $ npm run dev
 
-# Consola 2: Portal del Administrador Web
+# Consola 2: Frontend (Portal del Administrador Web)
 $ cd frontend 
 $ npm install 
 $ npm run dev
 
-# Consola 3: Entorno Cliente Pasajero/Conductor
+# Consola 3: Mobile (Entorno Cliente Pasajero/Conductor)
 $ cd mobile 
 $ npm install 
 $ npx expo start
