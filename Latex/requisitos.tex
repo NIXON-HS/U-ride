@@ -1,0 +1,361 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{ragged2e}
+\usepackage{enumitem}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=3cm, right=2.5cm}
+
+\definecolor{primary}{HTML}{4F46E5}
+\definecolor{secondary}{HTML}{10B981}
+\definecolor{rowgray}{HTML}{F8FAFC}
+\definecolor{headbg}{HTML}{4F46E5}
+\definecolor{codbg}{HTML}{EEF2FF}
+\definecolor{warnbg}{HTML}{FFFBEB}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{primary}{\textbf{U-Ride}} — Matriz de Requisitos del Sistema}
+\fancyhead[R]{\small Gestión de Pruebas e Implantación de Software}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\large\bfseries\color{primary}}{}{0em}{}[\titlerule]
+
+\newcommand{\code}[1]{\colorbox{codbg}{\footnotesize\texttt{#1}}}
+
+\begin{document}
+
+% ── PORTADA ────────────────────────────────────────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{1.5cm}
+  {\Huge\bfseries\color{primary} U-Ride\par}
+  \vspace{0.3cm}
+  {\large Plataforma Institucional de Carpooling Universitario\par}
+  \vspace{1.2cm}
+  \rule{\linewidth}{1.5pt}\\[0.4cm]
+  {\LARGE\bfseries Matriz Completa de Requisitos Funcionales\\y No Funcionales del Sistema\par}
+  \vspace{0.2cm}
+  {\small\textit{Extraída íntegramente del código fuente del proyecto}\par}
+  \rule{\linewidth}{1.5pt}\\[1.8cm]
+  {\large Universidad Técnica de Ambato\par}
+  {\normalsize Facultad de Ingeniería en Sistemas, Electrónica e Industrial\par}
+  \vspace{0.5cm}
+  {\normalsize Asignatura: Gestión de Pruebas e Implantación de Software\par}
+  \vfill
+  {\normalsize Ambato -- Ecuador\quad|\quad\the\year\par}
+\end{titlepage}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Requisitos Funcionales (RF)}
+% ══════════════════════════════════════════════════════════════════════════════
+
+% Columnas: Código | Nombre | Descripción | Archivo Fuente
+\begin{longtable}{
+  >{\columncolor{headbg}\color{white}\bfseries\centering\arraybackslash}p{1.1cm}
+  >{\bfseries\arraybackslash}p{4.0cm}
+  >{\RaggedRight\arraybackslash}p{7.0cm}
+  >{\footnotesize\RaggedRight\arraybackslash}p{3.2cm}
+}
+\rowcolor{headbg}
+\textcolor{white}{\textbf{Cód.}} &
+\textcolor{white}{\textbf{Nombre}} &
+\textcolor{white}{\textbf{Descripción}} &
+\textcolor{white}{\textbf{Archivo Fuente}} \\
+\endfirsthead
+\rowcolor{headbg}
+\textcolor{white}{\textbf{Cód.}} &
+\textcolor{white}{\textbf{Nombre}} &
+\textcolor{white}{\textbf{Descripción}} &
+\textcolor{white}{\textbf{Archivo Fuente}} \\
+\endhead
+
+% ── RF1 ────────────────────────────────────────────────────────────────────────
+\rowcolor{rowgray}
+RF1 &
+Registro Institucional &
+El sistema valida que el correo proporcionado termine en \code{@uta.edu.ec}. Si no cumple, retorna \texttt{HTTP 403}. Verifica que el correo no esté registrado previamente (\texttt{HTTP 409} si duplicado). Los campos nombre, email y contraseña son obligatorios. &
+\code{authController.js:19} \\[4pt]
+
+RF2 &
+Inicio de Sesión Seguro &
+El sistema busca al usuario por correo, compara la contraseña ingresada contra el hash almacenado usando \code{bcrypt.compare}. Emite un \code{JWT} firmado con el \code{id} y \code{rol} del usuario, con expiración de 24 horas. &
+\code{authController.js:61} \\[4pt]
+
+\rowcolor{rowgray}
+RF3 &
+Gestión de Perfil de Usuario &
+El usuario puede actualizar: carrera, teléfono, foto de perfil (imagen procesada por \code{multer}), coordenadas de zona de referencia (\code{zona\_lat}, \code{zona\_lon}) y cambiar de rol entre \code{PASAJERO} y \code{CONDUCTOR}. La respuesta incluye estadísticas de viajes realizados. &
+\code{userController.js} \newline \code{ProfileScreen.tsx} \\[4pt]
+
+RF4 &
+Captura de Ubicación GPS &
+Desde la pantalla de perfil y publicación de viaje, el sistema solicita permiso de ubicación del dispositivo y obtiene las coordenadas actuales con \code{expo-location}. Realiza geocodificación inversa para mostrar la dirección en texto legible al usuario. &
+\code{ProfileScreen.tsx:46} \newline \code{PublishRideScreen.tsx:33} \\[4pt]
+
+\rowcolor{rowgray}
+RF5 &
+Publicación de Viaje (Conductor) &
+El conductor marca origen y destino en un mapa interactivo (\code{MapView}) tocando la pantalla. Registra: \code{origenLat}, \code{origenLon}, \code{destinoLat}, \code{destinoLon}, \code{fecha\_salida}, \code{cupos\_disponibles} ($\geq 1$), \code{notas\_reglas} (obligatorio) y \code{costo\_contribucion} (opcional). &
+\code{rideController.js:7} \newline \code{PublishRideScreen.tsx} \\[4pt]
+
+RF6 &
+Validación de Fecha de Publicación &
+Antes de enviar el viaje al servidor, el frontend verifica que la fecha y hora de salida no sea anterior al momento actual menos 60 segundos. Si el conductor ingresa una fecha pasada, se muestra una alerta y se bloquea la publicación. &
+\code{PublishRideScreen.tsx:59} \\[4pt]
+
+\rowcolor{rowgray}
+RF7 &
+Búsqueda de Viajes por Zona (Pasajero) &
+El pasajero busca viajes activos enviando su latitud y longitud. El motor SQL usa la fórmula Haversine para calcular distancias y retorna máximo 25 resultados ordenados por proximidad. Solo aparecen viajes con \code{estado = 'ACTIVO'} y \code{cupos > 0}. &
+\code{rideController.js:85} \newline \code{HomeScreen.tsx:23} \\[4pt]
+
+RF8 &
+Filtrado de Viajes por Distancia y Fecha &
+El pasajero puede filtrar los viajes disponibles por radio (1 km, 3 km, 5 km, 10 km) y por fecha opcional mediante un modal de filtros. Los filtros se aplican en la petición al backend. Por defecto el radio es 3 km. &
+\code{HomeScreen.tsx:195} \\[4pt]
+
+\rowcolor{rowgray}
+RF9 &
+Visualización Obligatoria de Reglas del Viaje &
+Al tocar una tarjeta de viaje, el pasajero ve un bottom-sheet modal con las reglas/notas del conductor antes de poder solicitar el cupo. Solo desde ese modal se puede enviar la solicitud. El campo \code{notas\_reglas} es \code{NOT NULL} a nivel de base de datos. &
+\code{HomeScreen.tsx:156} \newline \code{rideController.js:36} \\[4pt]
+
+RF10 &
+Solicitud de Cupo (Pasajero) &
+El pasajero envía una solicitud al conductor. El sistema verifica: que su cuenta no esté suspendida, que el viaje esté activo con cupos disponibles, que no sea el propio conductor y que no haya enviado ya una solicitud al mismo viaje. Se crea en estado \code{PENDIENTE}. &
+\code{requestController.js:6} \\[4pt]
+
+\rowcolor{rowgray}
+RF11 &
+Bandeja de Solicitudes del Conductor &
+El conductor consulta sus solicitudes entrantes en estado \code{PENDIENTE}, visualizando nombre y reputación promedio de cada pasajero. Puede aceptar o rechazar cada postulación. Solo el dueño del viaje puede gestionar sus propias solicitudes. &
+\code{requestController.js:53} \newline \code{DriverScreen.tsx} \\[4pt]
+
+RF12 &
+Confirmación Transaccional de Cupo &
+Al aceptar una solicitud, el sistema ejecuta una transacción ACID (\code{BEGIN/COMMIT/ROLLBACK}) con bloqueo de fila (\code{FOR UPDATE}) que: decrementa \code{cupos\_disponibles} en 1, actualiza el estado de la solicitud a \code{ACEPTADO} y registra el evento en auditoría. &
+\code{requestController.js:66} \\[4pt]
+
+\rowcolor{rowgray}
+RF13 &
+Seguimiento de Solicitudes (Pasajero) &
+El pasajero consulta todas sus solicitudes enviadas con sus estados (\code{PENDIENTE}, \code{ACEPTADO}, \code{RECHAZADO}), la fecha del viaje y el estado del viaje. Si la solicitud fue aceptada y el conductor tiene teléfono registrado, aparece un botón de llamada directa. &
+\code{requestController.js:154} \newline \code{PassengerRequestsScreen.tsx} \\[4pt]
+
+RF14 &
+Calificaciones y Motor de Reputación &
+Tras un viaje, el usuario puede calificar a otro participante con 1 a 5 estrellas y comentario. El sistema bloquea auto-calificaciones y calificaciones duplicadas por viaje. Recalcula automáticamente el \code{reputacion\_promedio} con \code{AVG} redondeado a 2 decimales, dentro de la misma transacción. &
+\code{reviewController.js} \\[4pt]
+
+\rowcolor{rowgray}
+RF15 &
+Reporte de Conducta Indebida &
+Cualquier usuario autenticado puede denunciar a un participante de un viaje previo. Debe seleccionar el viaje, seleccionar al participante de la lista y describir el motivo con mínimo 20 caracteres. Puede adjuntar evidencia fotográfica. El sistema impide auto-reportes. &
+\code{reportController.js} \newline \code{ReportScreen.tsx} \\[4pt]
+
+RF16 &
+Historial de Viajes para Reportes &
+Antes de reportar, el sistema carga el historial completo de viajes del usuario (como conductor o pasajero aceptado) para que el reporte esté contextualizado en un viaje real. Luego carga los participantes del viaje seleccionado. &
+\code{rideController.js:165} \newline \code{rideController.js:205} \\[4pt]
+
+\rowcolor{rowgray}
+RF17 &
+Administración: Revisión de Reportes &
+El administrador accede al portal web exclusivo y visualiza todos los reportes con sus detalles expandibles: motivo completo, evidencia, denunciante, denunciado, fecha exacta y resolución aplicada. Las filas son expandibles con clic. &
+\code{adminController.js:8} \newline \code{App.jsx (frontend)} \\[4pt]
+
+RF18 &
+Administración: Advertencia al Infractor &
+El administrador aplica una advertencia formal. El reporte se cierra con \code{estado = 'RESUELTO'} y \code{resolucion\_admin = 'ADVERTENCIA'}. El usuario conserva su cuenta activa pero recibe una notificación en su pestaña de Solicitudes con el motivo del reporte. &
+\code{adminController.js:54} \\[4pt]
+
+\rowcolor{rowgray}
+RF19 &
+Administración: Suspensión de Usuario &
+El administrador suspende una cuenta: la marca como \code{activo = FALSE}, cierra el reporte con \code{resolucion\_admin = 'SUSPENSION'} y registra la acción en auditoría. El usuario suspendido puede iniciar sesión para leer la notificación pero no puede publicar viajes ni solicitar cupos. &
+\code{adminController.js:27} \\[4pt]
+
+RF20 &
+Notificaciones de Infracciones al Infractor &
+Los usuarios ven en su pestaña de Solicitudes una tarjeta especial si han recibido una resolución administrativa. La tarjeta muestra si fue \code{ADVERTENCIA} (naranja) o \code{SUSPENSION} (roja) con el motivo completo del reporte que la originó. &
+\code{reportController.js:49} \newline \code{DriverScreen.tsx} \newline \code{PassengerRequestsScreen.tsx} \\[4pt]
+
+\rowcolor{rowgray}
+RF21 &
+Cierre Automático de Viajes Expirados &
+Un proceso en segundo plano se ejecuta cada 60 segundos y cambia automáticamente a \code{estado = 'CERRADO'} todos los viajes cuya \code{fecha\_salida} ya haya transcurrido y que estén en estado \code{ACTIVO}. No requiere intervención manual del conductor. &
+\code{cronJobs.js:10} \\[4pt]
+
+RF22 &
+Persistencia de Sesión en la App Móvil &
+El token y los datos del usuario se persisten en \code{AsyncStorage} del dispositivo. Al reabrir la app, el sistema restaura automáticamente la sesión sin que el usuario tenga que iniciar sesión de nuevo. &
+\code{userStore.ts:37} \\[4pt]
+
+\rowcolor{rowgray}
+RF23 &
+Procesamiento de Contribución Económica (Simulado) &
+El sistema acepta un token de tarjeta (\code{token\_stripe}) y un monto para simular el cobro de la contribución al conductor. Valida el token y retorna un número de recibo simulado (\code{tx\_xxxxxxxx}). En modo prueba, rechaza explícitamente \code{tok\_chargeDeclined}. &
+\code{paymentController.js} \\[4pt]
+
+RF24 &
+Rastreo GPS en Tiempo Real (WebSocket) &
+El conductor emite su ubicación en tiempo real al servidor mediante el evento \code{update\_location}. El servidor difunde (\textit{broadcast}) las coordenadas a todos los pasajeros unidos al canal del viaje (\code{join\_ride}). Implementado con \code{Socket.io} para comunicación bidireccional. &
+\code{trackerSocket.js} \\[4pt]
+
+\end{longtable}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Requisitos No Funcionales (RNF)}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{longtable}{
+  >{\columncolor{headbg}\color{white}\bfseries\centering\arraybackslash}p{1.1cm}
+  >{\bfseries\arraybackslash}p{4.0cm}
+  >{\RaggedRight\arraybackslash}p{7.0cm}
+  >{\footnotesize\RaggedRight\arraybackslash}p{3.2cm}
+}
+\rowcolor{headbg}
+\textcolor{white}{\textbf{Cód.}} &
+\textcolor{white}{\textbf{Nombre}} &
+\textcolor{white}{\textbf{Evidencia en el Código}} &
+\textcolor{white}{\textbf{Archivo Fuente}} \\
+\endfirsthead
+\rowcolor{headbg}
+\textcolor{white}{\textbf{Cód.}} &
+\textcolor{white}{\textbf{Nombre}} &
+\textcolor{white}{\textbf{Evidencia en el Código}} &
+\textcolor{white}{\textbf{Archivo Fuente}} \\
+\endhead
+
+% ── RNF1 ───────────────────────────────────────────────────────────────────────
+\rowcolor{rowgray}
+RNF1 &
+Cifrado de Contraseñas &
+Las contraseñas se cifran con \code{bcrypt} aplicando un salt de 10 rondas antes de insertar en la BD. Nunca se almacena la contraseña en texto plano. &
+\code{authController.js:34} \\[4pt]
+
+RNF2 &
+Autenticación con JWT &
+Todos los endpoints de la API (excepto registro y login) están protegidos por \code{authMiddleware.js}, que verifica el token JWT de la cabecera \code{Authorization: Bearer}. Tokens inválidos o expirados retornan \texttt{HTTP 400}. El token expira en 24 h. &
+\code{authMiddleware.js} \\[4pt]
+
+\rowcolor{rowgray}
+RNF3 &
+Control de Acceso por Rol Administrativo &
+Las rutas del panel administrativo (\code{/api/admin/*}) están doblemente protegidas: primero por \code{authMiddleware} (JWT válido) y luego por \code{adminMiddleware}, que rechaza con \texttt{HTTP 403} si el rol no es \code{ADMINISTRADOR}. &
+\code{adminMiddleware.js} \\[4pt]
+
+RNF4 &
+Privacidad Geoespacial &
+El sistema no expone coordenadas GPS exactas de domicilios. El motor de búsqueda trabaja con radio de proximidad (3 km por defecto). La fórmula Haversine se calcula en el servidor, no en el cliente. &
+\code{rideController.js:124} \\[4pt]
+
+\rowcolor{rowgray}
+RNF5 &
+Trazabilidad y Auditoría &
+Toda acción crítica genera un registro en \code{logs\_eventos} con: \code{usuario\_id}, \code{tipo\_evento} y \code{detalles} en \code{JSONB}. Eventos registrados: \code{PUBLICACION\_VIAJE}, \code{ACEPTACION\_CUPO}, \code{SUSPENSION\_ADMINISTRATIVA}, \code{EMISION\_ALARMA\_REPORTE}. &
+\code{rideController.js:67} \newline \code{requestController.js:107} \newline \code{adminController.js:40} \newline \code{reportController.js:32} \\[4pt]
+
+RNF6 &
+Integridad Transaccional ACID &
+Las operaciones de aceptación de cupo y calificaciones usan transacciones explícitas con \code{BEGIN/COMMIT/ROLLBACK}. El bloqueo \code{FOR UPDATE} previene condiciones de carrera en solicitudes simultáneas. En caso de error, el \code{ROLLBACK} protege la integridad de los cupos. &
+\code{requestController.js:55} \newline \code{reviewController.js:36} \\[4pt]
+
+\rowcolor{rowgray}
+RNF7 &
+Restricciones de Integridad en Base de Datos &
+El esquema SQL impone: \code{UNIQUE(email)}, \code{UNIQUE(viaje\_id, pasajero\_id)}, \code{UNIQUE(viaje\_id, evaluador\_id, evaluado\_id)}, \code{CHECK(calificacion BETWEEN 1 AND 5)}, \code{CHECK(cupos\_disponibles >= 0)} y \code{NOT NULL} en campos críticos. &
+\code{schema.sql} \\[4pt]
+
+RNF8 &
+Usabilidad: Teclado y Formularios &
+Los formularios de la app móvil usan \code{KeyboardAvoidingView} con \code{behavior="padding"} para evitar que el teclado virtual tape los campos de entrada. Los componentes de formulario (campos reutilizables) se definen fuera del componente principal para evitar re-montajes en cada teclazo. &
+\code{PublishRideScreen.tsx:82} \newline \code{RegisterScreen.tsx} \\[4pt]
+
+\rowcolor{rowgray}
+RNF9 &
+Sistema de Diseño Consistente &
+Todos los componentes visuales de la app móvil usan tokens centralizados: colores, fuentes (6 variantes de \code{Outfit}), radios de borde y sombras. La interfaz es compatible con muescas de Android e iOS mediante \code{SafeAreaView}. &
+\code{theme/design.ts} \\[4pt]
+
+RNF10 &
+Compatibilidad Multiplataforma Móvil &
+El código de la app detecta \code{Platform.OS} para ajustar el \code{paddingTop} de los encabezados según Android o iOS, usando \code{StatusBar.currentHeight} como referencia en Android. El mapa usa \code{PROVIDER\_GOOGLE} para consistencia entre plataformas. &
+\code{HomeScreen.tsx:254} \newline \code{DriverScreen.tsx:111} \\[4pt]
+
+\rowcolor{rowgray}
+RNF11 &
+Restricción de Dominio Institucional &
+El registro solo permite correos con extensión \code{@uta.edu.ec}. Esta validación se aplica en el servidor y no puede eludirse desde el cliente. La regla institucional está comentada explícitamente en el código. &
+\code{authController.js:19} \\[4pt]
+
+RNF12 &
+Escalabilidad Modular del Backend &
+El backend está organizado en capas separadas: \texttt{/controllers}, \texttt{/routes}, \texttt{/middlewares}, \texttt{/config} y \texttt{/sockets}. Cada módulo funcional tiene su propio controlador y archivo de rutas independiente. &
+\code{backend/src/} (estructura) \\[4pt]
+
+\rowcolor{rowgray}
+RNF13 &
+Disponibilidad del Motor de Automatización &
+El cron job se inicializa en el arranque del servidor (\code{server.js}) y es independiente del flujo de peticiones HTTP. Ante un error interno del cron, el servidor registra el fallo en consola pero no se detiene. &
+\code{cronJobs.js} \newline \code{server.js} \\[4pt]
+
+RNF14 &
+Validación de Motivo en Reportes &
+El formulario de reporte aplica una restricción de mínimo 20 caracteres en el motivo, tanto en el cliente (botón deshabilitado y contador visible) como en el servidor (validación de campo vacío). &
+\code{ReportScreen.tsx:83} \newline \code{reportController.js:14} \\[4pt]
+
+\rowcolor{rowgray}
+RNF15 &
+Comunicación en Tiempo Real (WebSocket) &
+El servidor inicializa \code{Socket.io} junto con el servidor HTTP. Las actualizaciones de ubicación se difunden únicamente dentro del canal de sala (\textit{room}) del viaje correspondiente, aislando el tráfico entre viajes diferentes. &
+\code{trackerSocket.js} \newline \code{server.js} \\[4pt]
+
+\end{longtable}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Resumen de Cobertura}
+% ══════════════════════════════════════════════════════════════════════════════
+
+\begin{center}
+\begin{tabular}{llc}
+\toprule
+\textbf{Categoría} & \textbf{Códigos} & \textbf{Cantidad} \\
+\midrule
+Requisitos Funcionales  & RF1 -- RF24 & \textbf{24} \\
+Requisitos No Funcionales & RNF1 -- RNF15 & \textbf{15} \\
+\midrule
+\textbf{Total} & & \textbf{39} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\vspace{1.2cm}
+\noindent\textcolor{primary}{\rule{\linewidth}{0.8pt}}
+\begin{center}
+\small\textit{Todos los requisitos fueron extraídos directamente del código fuente:\\
+\texttt{backend/src/controllers/}, \texttt{backend/src/middlewares/}, \texttt{backend/src/models/schema.sql},\\
+\texttt{backend/src/sockets/}, \texttt{backend/src/config/cronJobs.js},\\
+\texttt{mobile/src/screens/}, \texttt{mobile/src/store/userStore.ts}\\[4pt]
+Universidad Técnica de Ambato — \the\year}
+\end{center}
+
+\end{document}
