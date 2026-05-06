@@ -1,5 +1,9 @@
+jest.mock('../../src/config/database', () => ({
+  query: jest.fn()
+}));
+
 const request = require('supertest');
-const app = require('../../src/server'); // El servidor exportado
+const app = require('../../src/server');
 
 describe('U-Ride API Tests', () => {
   it('Debe responder 200 al endpoint de Health Check', async () => {
