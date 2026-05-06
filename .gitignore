@@ -11,6 +11,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 # 2. Entorno y Seguridad (¡No cargar datos sensibles!)
+.env.example
 .env
 .env.local
 .env.development.local
