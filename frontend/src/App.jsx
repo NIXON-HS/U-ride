@@ -5,6 +5,8 @@ import {
   Users, AlertTriangle, CheckCircle, Mail, Lock,
   Ban, CheckSquare, TrendingUp, FileText, ChevronDown, ChevronUp, X
 } from 'lucide-react';
+import ForgotPasswordPage from './ForgotPassword';
+import ResetPasswordPage from './ResetPassword';
 import './index.css';
 
 const api = axios.create({ baseURL: 'http://localhost:5000/api' });
@@ -17,8 +19,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
-  const [confirmModal, setConfirmModal] = useState(null); // { tipo, userId, reportId, nombre }
+  const [confirmModal, setConfirmModal] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetToken, setResetToken] = useState(null);
 
   const toggleExpand = (id) => setExpandedId(prev => prev === id ? null : id);
 
@@ -28,6 +32,24 @@ function App() {
   useEffect(() => {
     const tk = localStorage.getItem('admin_token');
     if (tk) setToken(tk);
+  }, []);
+
+  useEffect(() => {
+    // Detectar token de reset en la URL (ej: /reset-password/TOKEN)
+    const pathname = window.location.pathname;
+    if (pathname.includes('/reset-password/')) {
+      const token = pathname.split('/reset-password/')[1];
+      if (token) {
+        setResetToken(token);
+      }
+    }
+    
+    // También buscar en query parameters por si acaso
+    const params = new URLSearchParams(window.location.search);
+    const resetTokenFromUrl = params.get('reset');
+    if (resetTokenFromUrl) {
+      setResetToken(resetTokenFromUrl);
+    }
   }, []);
 
   const handleLogin = async (e) => {
@@ -96,6 +118,15 @@ function App() {
 
   // ── LOGIN ──────────────────────────────────────────────────────────────
   if (!token) {
+    if (resetToken) {
+      return <ResetPasswordPage token={resetToken} onBack={() => {
+        setResetToken(null);
+        window.history.replaceState({}, document.title, '/');
+      }} />;
+    }
+    if (showForgotPassword) {
+      return <ForgotPasswordPage onBack={() => setShowForgotPassword(false)} />;
+    }
     return (
       <div className="login-screen">
         <div className="login-blob1" />
@@ -134,6 +165,9 @@ function App() {
                   Acceder al Panel
                 </>
               )}
+            </button>
+            <button type="button" className="btn btn-ghost" style={{ width: '100%', marginTop: 12, justifyContent: 'center' }} onClick={() => setShowForgotPassword(true)}>
+              ¿Olvidaste tu contraseña?
             </button>
           </form>
         </div>

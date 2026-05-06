@@ -16,6 +16,13 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// 📋 Middleware de Logging para VER TODAS LAS SOLICITUDES
+app.use((req, res, next) => {
+  const timestamp = new Date().toLocaleTimeString();
+  console.log(`[${timestamp}] ${req.method} ${req.path}`);
+  next();
+});
+
 // Inyectar Rutina Extra Sockets Tracker
 require('./sockets/trackerSocket')(io);
 
@@ -29,6 +36,7 @@ app.get('/api/health', (req, res) => {
 
 // Importación y Uso de Modulos/Rutas
 const authRoutes = require('./routes/authRoutes');
+const passwordRoutes = require('./routes/passwordRoutes');
 const userRoutes = require('./routes/userRoutes');
 const rideRoutes = require('./routes/rideRoutes');
 const requestRoutes = require('./routes/requestRoutes');
@@ -38,6 +46,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', passwordRoutes);
 app.use('/api', userRoutes);
 app.use('/api', rideRoutes);
 app.use('/api', requestRoutes);

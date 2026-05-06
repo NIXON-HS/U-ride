@@ -84,9 +84,14 @@ export default function LoginScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.link} onPress={() => navigation.navigate('Register')}>
-            <Text style={styles.linkText}>¿Sin cuenta? <Text style={styles.linkBold}>Regístrate →</Text></Text>
-          </TouchableOpacity>
+          <View style={styles.linksContainer}>
+            <TouchableOpacity style={styles.link} onPress={() => navigation.navigate('ForgotPassword')}>
+              <Text style={styles.linkText}>¿Olvidaste tu contraseña?</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.link} onPress={() => navigation.navigate('Register')}>
+              <Text style={styles.linkText}>¿Sin cuenta? <Text style={styles.linkBold}>Regístrate →</Text></Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -109,7 +114,8 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: COLORS.primary, borderRadius: RADIUS.md, padding: 16, alignItems: 'center', marginTop: 8, ...SHADOW.md },
   btnInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   btnText: { fontFamily: FONTS.bold, fontSize: 16, color: '#fff' },
-  link: { marginTop: 20, alignItems: 'center' },
+  linksContainer: { marginTop: 20, gap: 12 },
+  link: { alignItems: 'center', paddingVertical: 8 },
   linkText: { fontFamily: FONTS.regular, fontSize: 14, color: COLORS.gray },
   linkBold: { fontFamily: FONTS.bold, color: COLORS.primary },
 });

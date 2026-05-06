@@ -15,6 +15,8 @@ CREATE TABLE usuarios (
     zona_lat FLOAT,
     zona_lon FLOAT,
     reputacion_promedio DECIMAL(3,2) DEFAULT 5.00,
+    password_reset_token VARCHAR(255),
+    password_reset_expiry TIMESTAMP,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -80,6 +82,7 @@ CREATE TABLE reportes (
     motivo TEXT NOT NULL,
     evidencia_url VARCHAR(255),
     estado VARCHAR(20) DEFAULT 'ABIERTO', -- ABIERTO, RESUELTO, DESESTIMADO
+    resolucion_admin VARCHAR(50),
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
