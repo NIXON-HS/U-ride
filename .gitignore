@@ -58,11 +58,19 @@ Thumbs.db
 *.sln
 *.sw?
 
-# 7. Testing (Supertest / Jest local states)
+# 8. Testing (Supertest / Jest local states)
 .jest-test-results.json
 
-# 8. Documentación y LaTeX
+# 9. Documentación y LaTeX
 Latex/
 documentacion/
 TAREAS_URIDE.md/
+
+# 10. Pruebas Unitarias (Carpeta completa)
+pruebas unitarias/
+
+# 11. Archivos y carpetas adicionales
+vo7/
+VO7/
+COVERAGE_REPORT_LOGIN.md
 
