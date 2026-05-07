@@ -112,6 +112,11 @@ DB_USER=postgres    # Tu usuario de PostgreSQL
 DB_PASSWORD=secret  # Tu contraseña de PostgreSQL
 DB_NAME=uride       # Nombre de la base de datos que creaste
 JWT_SECRET=tu-llave-segura
+
+# Credenciales para el envío de correos (Recuperación de Contraseña)
+GMAIL_EMAIL=tu_correo@gmail.com
+GMAIL_PASSWORD=tu_app_password
+GMAIL_SMTP_HOST=smtp.gmail.com
 ```
 
 ### 2. Inicialización de la Base de Datos

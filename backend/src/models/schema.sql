@@ -80,6 +80,7 @@ CREATE TABLE reportes (
     motivo TEXT NOT NULL,
     evidencia_url VARCHAR(255),
     estado VARCHAR(20) DEFAULT 'ABIERTO', -- ABIERTO, RESUELTO, DESESTIMADO
+    resolucion_admin VARCHAR(50),
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -91,3 +92,8 @@ CREATE TABLE logs_eventos (
     detalles JSONB,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 8. Migración: Recuperación de Contraseña (Password Recovery)
+-- Ejecutar después de crear la tabla usuarios
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS reset_otp VARCHAR(10);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS reset_otp_expires TIMESTAMP;

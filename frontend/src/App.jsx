@@ -13,6 +13,10 @@ function App() {
   const [token, setToken]     = useState(null);
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
+  const [authView, setAuthView] = useState('login');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -28,7 +32,52 @@ function App() {
   useEffect(() => {
     const tk = localStorage.getItem('admin_token');
     if (tk) setToken(tk);
+
+    const params = new URLSearchParams(window.location.search);
+    const tokenParam = params.get('token');
+    const emailParam = params.get('email');
+    if (tokenParam && emailParam) {
+      setAuthView('reset-password');
+      setResetToken(tokenParam);
+      setEmail(emailParam);
+    }
   }, []);
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    try {
+      const res = await api.post('/auth/forgot-password', { email });
+      alert(res.data.message || 'Enlace de recuperación enviado.');
+      setAuthView('login');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al solicitar recuperación.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      alert('Las contraseñas no coinciden.');
+      return;
+    }
+    setLoginLoading(true);
+    try {
+      const res = await api.post('/auth/reset-password', { email, otp: resetToken, newPassword });
+      alert(res.data.message || 'Contraseña actualizada exitosamente.');
+      setAuthView('login');
+      setPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Error al restablecer contraseña.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -107,35 +156,96 @@ function App() {
             </div>
             <span className="login-app-name">U-Ride</span>
           </div>
-          <p className="login-subtitle">Panel de Administración · RF11</p>
-          <h2 className="login-title">Iniciar Sesión</h2>
 
-          <form onSubmit={handleLogin}>
-            <div className="form-group">
-              <label className="form-label">Correo Administrativo</label>
-              <div className="input-wrapper">
-                <Mail size={18} />
-                <input type="email" placeholder="admin@uta.edu.ec" value={email}
-                  onChange={e => setEmail(e.target.value)} required />
-              </div>
-            </div>
-            <div className="form-group" style={{ marginBottom: 24 }}>
-              <label className="form-label">Contraseña</label>
-              <div className="input-wrapper">
-                <Lock size={18} />
-                <input type="password" placeholder="Contraseña" value={password}
-                  onChange={e => setPassword(e.target.value)} required />
-              </div>
-            </div>
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px' }}>
-              {loginLoading ? <span className="spinner" /> : (
-                <>
-                  <ShieldCheck size={18} />
-                  Acceder al Panel
-                </>
-              )}
-            </button>
-          </form>
+          {authView === 'login' && (
+            <>
+              <p className="login-subtitle">Panel de Administración · RF11</p>
+              <h2 className="login-title">Iniciar Sesión</h2>
+              <form onSubmit={handleLogin}>
+                <div className="form-group">
+                  <label className="form-label">Correo Administrativo</label>
+                  <div className="input-wrapper">
+                    <Mail size={18} />
+                    <input type="email" placeholder="admin@uta.edu.ec" value={email}
+                      onChange={e => setEmail(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: 12 }}>
+                  <label className="form-label">Contraseña</label>
+                  <div className="input-wrapper">
+                    <Lock size={18} />
+                    <input type="password" placeholder="Contraseña" value={password}
+                      onChange={e => setPassword(e.target.value)} required />
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right', marginBottom: 24 }}>
+                  <button type="button" onClick={() => setAuthView('forgot-password')} style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>¿Olvidaste tu contraseña?</button>
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px' }}>
+                  {loginLoading ? <span className="spinner" /> : (
+                    <>
+                      <ShieldCheck size={18} />
+                      Acceder al Panel
+                    </>
+                  )}
+                </button>
+              </form>
+            </>
+          )}
+
+          {authView === 'forgot-password' && (
+            <>
+              <p className="login-subtitle">Recuperación de Acceso</p>
+              <h2 className="login-title">¿Olvidaste tu contraseña?</h2>
+              <form onSubmit={handleForgotPassword}>
+                <div className="form-group" style={{ marginBottom: 24 }}>
+                  <label className="form-label">Correo Institucional</label>
+                  <div className="input-wrapper">
+                    <Mail size={18} />
+                    <input type="email" placeholder="admin@uta.edu.ec" value={email}
+                      onChange={e => setEmail(e.target.value)} required />
+                  </div>
+                  <p style={{ fontSize: 13, color: 'var(--gray)', marginTop: 8 }}>
+                    Te enviaremos un enlace para restablecer tu contraseña.
+                  </p>
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px', marginBottom: 16 }}>
+                  {loginLoading ? <span className="spinner" /> : 'Enviar Enlace de Recuperación'}
+                </button>
+                <button type="button" onClick={() => setAuthView('login')} className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}>
+                  Volver a Iniciar Sesión
+                </button>
+              </form>
+            </>
+          )}
+
+          {authView === 'reset-password' && (
+            <>
+              <p className="login-subtitle">Paso Final</p>
+              <h2 className="login-title">Nueva Contraseña</h2>
+              <form onSubmit={handleResetPassword}>
+                <div className="form-group">
+                  <label className="form-label">Nueva Contraseña</label>
+                  <div className="input-wrapper">
+                    <Lock size={18} />
+                    <input type="password" placeholder="Ingresa tu nueva contraseña" value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: 24 }}>
+                  <label className="form-label">Confirmar Contraseña</label>
+                  <div className="input-wrapper">
+                    <CheckSquare size={18} />
+                    <input type="password" placeholder="Confirma tu contraseña" value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)} required />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px' }}>
+                  {loginLoading ? <span className="spinner" /> : 'Actualizar Contraseña'}
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
     );
