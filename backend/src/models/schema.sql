@@ -91,3 +91,19 @@ CREATE TABLE logs_eventos (
     detalles JSONB,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 8. Verificaciones de Registro Pendientes
+CREATE TABLE verificaciones_pendientes (
+    email VARCHAR(100) PRIMARY KEY,
+    codigo VARCHAR(10) NOT NULL,
+    datos JSONB NOT NULL,
+    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 9. Recuperaciones de Contraseña
+CREATE TABLE recuperaciones_contrasena (
+    email VARCHAR(100) PRIMARY KEY,
+    codigo VARCHAR(10) NOT NULL,
+    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
