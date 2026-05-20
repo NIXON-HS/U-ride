@@ -1,5 +1,10 @@
 const pool = require('../config/database');
 
+const isOwnerOrAdmin = (ride, user) => {
+  if (!ride || !user) return false;
+  return ride.conductor_id === user.id || user.rol === 'ADMINISTRADOR';
+};
+
 /**
  * RF3: Publicación de Viaje (Conductor)
  * Intersecta con PostGIS Origines/Destinos.
@@ -93,9 +98,9 @@ exports.searchRides = async (req, res) => {
     // Si es CONDUCTOR, ignorar filtros espaciales y devolver SOLO sus viajes
     if (currentRol === 'CONDUCTOR') {
       const driverSQL = `
-        SELECT v.id, v.fecha_salida, v.cupos_disponibles, v.notas_reglas, v.costo_contribucion, v.estado,
+        SELECT v.id, v.conductor_id, v.fecha_salida, v.cupos_disponibles, v.notas_reglas, v.costo_contribucion, v.estado,
                u.nombre as conductor, u.reputacion_promedio as reputacion_conductor,
-               v.origen_lat, v.origen_lon,
+               v.origen_lat, v.origen_lon, v.destino_lat, v.destino_lon,
                COALESCE((
                  6371000 * acos(
                    LEAST(1.0, cos(radians(v.origen_lat)) * cos(radians(v.destino_lat)) *
@@ -174,7 +179,8 @@ exports.getMyTrips = async (req, res) => {
     
     if (rol === 'CONDUCTOR') {
       query = `
-        SELECT v.id, v.fecha_salida, v.origen_lat, v.destino_lat, v.estado, u.nombre as conductor
+        SELECT v.id, v.conductor_id, v.fecha_salida, v.origen_lat, v.origen_lon, v.destino_lat, v.destino_lon,
+               v.cupos_disponibles, v.notas_reglas, v.costo_contribucion, v.estado, u.nombre as conductor
         FROM viajes v
         JOIN usuarios u ON v.conductor_id = u.id
         WHERE v.conductor_id = $1
@@ -182,7 +188,8 @@ exports.getMyTrips = async (req, res) => {
       `;
     } else {
       query = `
-        SELECT v.id, v.fecha_salida, v.origen_lat, v.destino_lat, v.estado, u.nombre as conductor
+        SELECT v.id, v.conductor_id, v.fecha_salida, v.origen_lat, v.origen_lon, v.destino_lat, v.destino_lon,
+               v.cupos_disponibles, v.notas_reglas, v.costo_contribucion, v.estado, u.nombre as conductor
         FROM viajes v
         JOIN usuarios u ON v.conductor_id = u.id
         JOIN solicitudes s ON s.viaje_id = v.id
@@ -196,6 +203,211 @@ exports.getMyTrips = async (req, res) => {
     return res.status(200).json({ viajes: result.rows });
   } catch (error) {
     return res.status(500).json({ error: 'Error obteniendo tus viajes.' });
+  }
+};
+
+/**
+ * Ver detalle de un viaje.
+ */
+exports.getRideById = async (req, res) => {
+  try {
+    const viajeId = req.params.id;
+
+    const query = `
+      SELECT v.id, v.conductor_id, v.fecha_salida, v.origen_lat, v.origen_lon, v.destino_lat, v.destino_lon,
+             v.cupos_disponibles, v.notas_reglas, v.costo_contribucion, v.estado,
+             u.nombre as conductor, u.reputacion_promedio as reputacion_conductor
+      FROM viajes v
+      JOIN usuarios u ON v.conductor_id = u.id
+      WHERE v.id = $1
+    `;
+
+    const result = await pool.query(query, [viajeId]);
+    const viaje = result.rows[0];
+
+    if (!viaje) {
+      return res.status(404).json({ error: 'El viaje no existe.' });
+    }
+
+    const isAdmin = req.user.rol === 'ADMINISTRADOR';
+    const isOwner = viaje.conductor_id === req.user.id;
+
+    let isAcceptedPassenger = false;
+    if (!isAdmin && !isOwner) {
+      const passengerRes = await pool.query(
+        'SELECT 1 FROM solicitudes WHERE viaje_id = $1 AND pasajero_id = $2 AND estado = $3 LIMIT 1',
+        [viajeId, req.user.id, 'ACEPTADO']
+      );
+      isAcceptedPassenger = passengerRes.rowCount > 0;
+    }
+
+    if (!isAdmin && !isOwner && !isAcceptedPassenger) {
+      return res.status(403).json({ error: 'No tienes permisos para ver este viaje.' });
+    }
+
+    return res.status(200).json({ viaje });
+  } catch (error) {
+    return res.status(500).json({ error: 'Error obteniendo el viaje.' });
+  }
+};
+
+/**
+ * Editar un viaje publicado.
+ */
+exports.updateRide = async (req, res) => {
+  try {
+    const viajeId = req.params.id;
+    const { origenLat, origenLon, destinoLat, destinoLon, fecha_salida, cupos_disponibles, notas_reglas, costo_contribucion } = req.body;
+
+    const tripRes = await pool.query('SELECT conductor_id, estado FROM viajes WHERE id = $1', [viajeId]);
+    const viaje = tripRes.rows[0];
+
+    if (!viaje) {
+      return res.status(404).json({ error: 'El viaje no existe.' });
+    }
+
+    if (viaje.conductor_id !== req.user.id && req.user.rol !== 'ADMINISTRADOR') {
+      return res.status(403).json({ error: 'Solo el conductor puede editar este viaje.' });
+    }
+
+    if (viaje.estado !== 'ACTIVO') {
+      return res.status(409).json({ error: 'Solo puedes editar un viaje activo.' });
+    }
+
+    const fields = [];
+    const values = [];
+
+    const addField = (column, value) => {
+      values.push(value);
+      fields.push(`${column} = $${values.length}`);
+    };
+
+    if (origenLat !== undefined) addField('origen_lat', origenLat);
+    if (origenLon !== undefined) addField('origen_lon', origenLon);
+    if (destinoLat !== undefined) addField('destino_lat', destinoLat);
+    if (destinoLon !== undefined) addField('destino_lon', destinoLon);
+    if (fecha_salida !== undefined) addField('fecha_salida', fecha_salida);
+    if (cupos_disponibles !== undefined) {
+      if (Number(cupos_disponibles) < 0) {
+        return res.status(400).json({ error: 'La capacidad no puede ser negativa.' });
+      }
+      addField('cupos_disponibles', cupos_disponibles);
+    }
+    if (notas_reglas !== undefined) {
+      if (!String(notas_reglas).trim()) {
+        return res.status(400).json({ error: 'Las reglas del viaje no pueden quedar vacías.' });
+      }
+      addField('notas_reglas', String(notas_reglas).trim());
+    }
+    if (costo_contribucion !== undefined) addField('costo_contribucion', costo_contribucion || 0);
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'Debes enviar al menos un campo para actualizar.' });
+    }
+
+    values.push(viajeId);
+    const updateSQL = `
+      UPDATE viajes
+      SET ${fields.join(', ')}
+      WHERE id = $${values.length}
+      RETURNING id, conductor_id, fecha_salida, origen_lat, origen_lon, destino_lat, destino_lon,
+                cupos_disponibles, notas_reglas, costo_contribucion, estado
+    `;
+
+    const result = await pool.query(updateSQL, values);
+    const viajeActualizado = result.rows[0];
+
+    await pool.query(
+      'INSERT INTO logs_eventos (usuario_id, tipo_evento, detalles) VALUES ($1, $2, $3)',
+      [req.user.id, 'ACTUALIZACION_VIAJE', JSON.stringify({ viaje_id: viajeId })]
+    );
+
+    return res.status(200).json({
+      message: 'Viaje actualizado correctamente.',
+      viaje: viajeActualizado
+    });
+  } catch (error) {
+    console.error('Error actualizando viaje:', error);
+    return res.status(500).json({ error: 'No se pudo actualizar el viaje.' });
+  }
+};
+
+/**
+ * Iniciar un viaje publicado.
+ */
+exports.startRide = async (req, res) => {
+  try {
+    const viajeId = req.params.id;
+    const tripRes = await pool.query('SELECT conductor_id, estado FROM viajes WHERE id = $1', [viajeId]);
+    const viaje = tripRes.rows[0];
+
+    if (!viaje) {
+      return res.status(404).json({ error: 'El viaje no existe.' });
+    }
+
+    if (viaje.conductor_id !== req.user.id && req.user.rol !== 'ADMINISTRADOR') {
+      return res.status(403).json({ error: 'Solo el conductor puede iniciar este viaje.' });
+    }
+
+    if (viaje.estado !== 'ACTIVO') {
+      return res.status(409).json({ error: 'Solo puedes iniciar un viaje activo.' });
+    }
+
+    const result = await pool.query(
+      `UPDATE viajes
+       SET estado = 'EN_CURSO'
+       WHERE id = $1
+       RETURNING id, conductor_id, fecha_salida, cupos_disponibles, estado`,
+      [viajeId]
+    );
+
+    await pool.query(
+      'INSERT INTO logs_eventos (usuario_id, tipo_evento, detalles) VALUES ($1, $2, $3)',
+      [req.user.id, 'INICIO_VIAJE', JSON.stringify({ viaje_id: viajeId })]
+    );
+
+    return res.status(200).json({
+      message: 'Viaje iniciado correctamente.',
+      viaje: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error iniciando viaje:', error);
+    return res.status(500).json({ error: 'No se pudo iniciar el viaje.' });
+  }
+};
+
+/**
+ * Eliminar un viaje publicado.
+ */
+exports.deleteRide = async (req, res) => {
+  try {
+    const viajeId = req.params.id;
+    const tripRes = await pool.query('SELECT conductor_id, estado FROM viajes WHERE id = $1', [viajeId]);
+    const viaje = tripRes.rows[0];
+
+    if (!viaje) {
+      return res.status(404).json({ error: 'El viaje no existe.' });
+    }
+
+    if (viaje.conductor_id !== req.user.id && req.user.rol !== 'ADMINISTRADOR') {
+      return res.status(403).json({ error: 'Solo el conductor puede eliminar este viaje.' });
+    }
+
+    if (viaje.estado !== 'ACTIVO') {
+      return res.status(409).json({ error: 'Solo puedes eliminar un viaje activo que aún no ha iniciado.' });
+    }
+
+    await pool.query('DELETE FROM viajes WHERE id = $1', [viajeId]);
+
+    await pool.query(
+      'INSERT INTO logs_eventos (usuario_id, tipo_evento, detalles) VALUES ($1, $2, $3)',
+      [req.user.id, 'ELIMINACION_VIAJE', JSON.stringify({ viaje_id: viajeId })]
+    );
+
+    return res.status(200).json({ message: 'Viaje eliminado correctamente.' });
+  } catch (error) {
+    console.error('Error eliminando viaje:', error);
+    return res.status(500).json({ error: 'No se pudo eliminar el viaje.' });
   }
 };
 
@@ -223,6 +435,47 @@ exports.getTripParticipants = async (req, res) => {
     return res.status(200).json({ participantes: result.rows });
   } catch (error) {
     return res.status(500).json({ error: 'Error obteniendo participantes.' });
+  }
+};
+
+/**
+ * Finalizar un viaje en curso.
+ */
+exports.finishRide = async (req, res) => {
+  try {
+    const viajeId = req.params.id;
+    const tripRes = await pool.query('SELECT conductor_id, estado FROM viajes WHERE id = $1', [viajeId]);
+    const viaje = tripRes.rows[0];
+
+    if (!viaje) {
+      return res.status(404).json({ error: 'El viaje no existe.' });
+    }
+
+    if (viaje.conductor_id !== req.user.id && req.user.rol !== 'ADMINISTRADOR') {
+      return res.status(403).json({ error: 'Solo el conductor puede finalizar este viaje.' });
+    }
+
+    if (viaje.estado !== 'EN_CURSO') {
+      return res.status(409).json({ error: 'Solo puedes finalizar un viaje que esté en curso.' });
+    }
+
+    const result = await pool.query(
+      `UPDATE viajes
+       SET estado = 'CERRADO'
+       WHERE id = $1
+       RETURNING id, conductor_id, fecha_salida, cupos_disponibles, estado`,
+      [viajeId]
+    );
+
+    await pool.query(
+      'INSERT INTO logs_eventos (usuario_id, tipo_evento, detalles) VALUES ($1, $2, $3)',
+      [req.user.id, 'FINALIZACION_VIAJE', JSON.stringify({ viaje_id: viajeId })]
+    );
+
+    return res.status(200).json({ message: 'Viaje finalizado correctamente.', viaje: result.rows[0] });
+  } catch (error) {
+    console.error('Error finalizando viaje:', error);
+    return res.status(500).json({ error: 'No se pudo finalizar el viaje.' });
   }
 };
 

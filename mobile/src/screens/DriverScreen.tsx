@@ -4,24 +4,29 @@ import {
   Alert, ActivityIndicator, Platform, StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
 import { COLORS, FONTS, RADIUS, SHADOW } from '../theme/design';
 
 export default function DriverScreen() {
+  const navigation = useNavigation();
   const [solicitudes, setSolicitudes] = useState<any[]>([]);
   const [infracciones, setInfracciones] = useState<any[]>([]);
+  const [toRate, setToRate] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchInbox = async () => {
     setLoading(true);
     try {
-      const [reqRes, infraRes] = await Promise.all([
+      const [reqRes, infraRes, rateRes] = await Promise.all([
         api.get('/solicitudes/conductor'),
         api.get('/reportes/infracciones'),
+        api.get('/solicitudes/para-calificar/conductor')
       ]);
       setSolicitudes(reqRes.data.solicitudes || []);
       setInfracciones(infraRes.data.infracciones || []);
+      setToRate(rateRes.data.solicitudes || []);
     } catch { /* sin conexión */ }
     finally { setLoading(false); }
   };
@@ -109,9 +114,7 @@ export default function DriverScreen() {
           <Text style={styles.headerTitle}>Bandeja de Solicitudes</Text>
           <Text style={styles.headerSub}>{solicitudes.length} solicitud{solicitudes.length !== 1 ? 'es' : ''} pendiente{solicitudes.length !== 1 ? 's' : ''}</Text>
         </View>
-        <TouchableOpacity style={styles.refreshBtn} onPress={fetchInbox}>
-          <Ionicons name="refresh-outline" size={20} color={COLORS.primary} />
-        </TouchableOpacity>
+        {/* Pull-to-refresh enabled on the list; removed redundant refresh button */}
       </View>
 
       {loading ? (
@@ -137,6 +140,38 @@ export default function DriverScreen() {
             </View>
           }
         />
+      )}
+
+      {toRate.length > 0 && (
+        <View style={{ padding: 16 }}>
+          <Text style={{ fontFamily: FONTS.black, fontSize: 18, marginBottom: 10 }}>Solicitudes para calificar</Text>
+          <FlatList
+            data={toRate}
+            keyExtractor={item => `rate-${item.id}`}
+            renderItem={({ item }) => (
+              <View style={[styles.card, { marginBottom: 12 }]}> 
+                <View style={styles.cardTop}>
+                  <View style={styles.avatarCircle}>
+                    <Text style={styles.avatarText}>{item.pasajero_nombre?.charAt(0) ?? '?'}</Text>
+                  </View>
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.pasajeroName}>{item.pasajero_nombre}</Text>
+                    <Text style={styles.repText}>Solicitado el {new Date(item.fecha_salida).toLocaleDateString()}</Text>
+                  </View>
+                  <View style={[styles.pendingBadge, { backgroundColor: '#ECFDF5' }]}>
+                    <Text style={styles.pendingText}>Cerrado</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+                  <TouchableOpacity style={[styles.acceptBtn, { paddingHorizontal: 18 }]} onPress={() => navigation.navigate('Rate', { viaje_id: item.viaje_id, evaluado_id: item.pasajero_id, nombre_evaluado: item.pasajero_nombre, onRated: fetchInbox })}>
+                    <Ionicons name="star" size={16} color="#fff" />
+                    <Text style={[styles.acceptText, { marginLeft: 8 }]}>Calificar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          />
+        </View>
       )}
     </SafeAreaView>
   );

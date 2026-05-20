@@ -14,7 +14,10 @@ import { COLORS, FONTS, RADIUS, SHADOW } from '../theme/design';
 
 type Coordenada = { latitud: number; longitud: number } | null;
 
-export default function PublishRideScreen({ navigation }: any) {
+export default function PublishRideScreen({ navigation, route }: any) {
+  const viajeEdit = route?.params?.viaje ?? null;
+  const isEditMode = Boolean(viajeEdit);
+
   const [loading, setLoading]       = useState(false);
   const [loadingGPS, setLoadingGPS] = useState(true);
   const [origen, setOrigen]         = useState<Coordenada>(null);
@@ -31,6 +34,28 @@ export default function PublishRideScreen({ navigation }: any) {
   });
 
   useEffect(() => {
+    if (isEditMode && viajeEdit) {
+      const origenLat = Number(viajeEdit.origen_lat);
+      const origenLon = Number(viajeEdit.origen_lon);
+      const destinoLat = Number(viajeEdit.destino_lat);
+      const destinoLon = Number(viajeEdit.destino_lon);
+
+      if (!Number.isNaN(origenLat) && !Number.isNaN(origenLon)) {
+        setOrigen({ latitud: origenLat, longitud: origenLon });
+        setRegion({ latitude: origenLat, longitude: origenLon, latitudeDelta: 0.015, longitudeDelta: 0.015 });
+      }
+      if (!Number.isNaN(destinoLat) && !Number.isNaN(destinoLon)) {
+        setDestino({ latitud: destinoLat, longitud: destinoLon });
+      }
+
+      if (viajeEdit.fecha_salida) setFechaDate(new Date(viajeEdit.fecha_salida));
+      if (viajeEdit.cupos_disponibles !== undefined) setCupos(String(viajeEdit.cupos_disponibles));
+      if (viajeEdit.notas_reglas) setReglas(String(viajeEdit.notas_reglas));
+      if (viajeEdit.costo_contribucion !== undefined) setCosto(String(viajeEdit.costo_contribucion));
+      setLoadingGPS(false);
+      return;
+    }
+
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -44,7 +69,7 @@ export default function PublishRideScreen({ navigation }: any) {
       setOrigen({ latitud: latitude, longitud: longitude });
       setLoadingGPS(false);
     })();
-  }, []);
+  }, [isEditMode, viajeEdit]);
 
   const handleMapPress = (e: any) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -60,18 +85,28 @@ export default function PublishRideScreen({ navigation }: any) {
 
     setLoading(true);
     try {
-      const resp = await api.post('/viajes', {
+      const payload = {
         origenLat: origen.latitud, origenLon: origen.longitud,
         destinoLat: destino.latitud, destinoLon: destino.longitud,
         fecha_salida: fechaDate.toISOString().slice(0, 19),
         cupos_disponibles: parseInt(cupos),
         notas_reglas: reglas.trim(),
         costo_contribucion: parseFloat(costo) || 0,
-      });
-      Alert.alert('Viaje Publicado', `Ruta #${resp.data.viaje.id} registrada. Los pasajeros ya pueden encontrarte.`,
-        [{ text: 'Ver Viajes', onPress: () => navigation.navigate('Home') }]);
+      };
+
+      const resp = isEditMode
+        ? await api.put(`/viajes/${viajeEdit.id}`, payload)
+        : await api.post('/viajes', payload);
+
+      Alert.alert(
+        isEditMode ? 'Viaje Actualizado' : 'Viaje Publicado',
+        isEditMode
+          ? 'Los cambios quedaron guardados correctamente.'
+          : `Ruta #${resp.data.viaje.id} registrada. Los pasajeros ya pueden encontrarte.`,
+        [{ text: 'Ver Viajes', onPress: () => navigation.navigate('Home') }]
+      );
     } catch (err: any) {
-      Alert.alert('Error', err.response?.data?.error || 'No se pudo publicar.');
+      Alert.alert('Error', err.response?.data?.error || (isEditMode ? 'No se pudo actualizar.' : 'No se pudo publicar.'));
     } finally {
       setLoading(false);
     }
@@ -85,9 +120,11 @@ export default function PublishRideScreen({ navigation }: any) {
         {/* Header */}
         <View style={styles.header}>
           <Ionicons name="car-sport" size={24} color={COLORS.secondary} />
-          <Text style={styles.title}>Publicar Viaje</Text>
+          <Text style={styles.title}>{isEditMode ? 'Editar Viaje' : 'Publicar Viaje'}</Text>
         </View>
-        <Text style={styles.subtitle}>Toca el mapa para marcar origen y destino de tu ruta</Text>
+        <Text style={styles.subtitle}>
+          {isEditMode ? 'Ajusta la ruta, las reglas y la capacidad del viaje' : 'Toca el mapa para marcar origen y destino de tu ruta'}
+        </Text>
 
         {/* Selector de Modo */}
         <View style={styles.modeRow}>
@@ -210,7 +247,7 @@ export default function PublishRideScreen({ navigation }: any) {
           {loading ? <ActivityIndicator color="#fff" /> : (
             <View style={styles.btnInner}>
               <Ionicons name="cloud-upload-outline" size={20} color="#fff" />
-              <Text style={styles.publishBtnText}>Publicar Viaje</Text>
+              <Text style={styles.publishBtnText}>{isEditMode ? 'Guardar Cambios' : 'Publicar Viaje'}</Text>
             </View>
           )}
         </TouchableOpacity>

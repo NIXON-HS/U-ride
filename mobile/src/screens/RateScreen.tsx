@@ -22,7 +22,11 @@ export default function RateScreen({ route, navigation }: any) {
     try {
       await api.post('/calificaciones', { viaje_id, evaluado_id, calificacion, comentario });
       Alert.alert('Evaluación enviada', `Tu calificación afecta la reputación de ${nombre_evaluado}.`,
-        [{ text: 'Listo', onPress: () => navigation.goBack() }]);
+        [{ text: 'Listo', onPress: () => {
+          // notify caller to refresh lists if provided
+          try { route.params?.onRated && route.params.onRated(); } catch(e) {}
+          navigation.goBack();
+        } }]);
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || 'No se pudo enviar la evaluación.');
     } finally {

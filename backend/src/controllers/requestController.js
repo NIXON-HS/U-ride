@@ -149,6 +149,27 @@ exports.getDriverRequests = async (req, res) => {
 };
 
 /**
+ * Obtener solicitudes que deben ser calificadas por el conductor: viajes CERRADOS con solicitudes ACEPTADO donde aún no ha calificado
+ */
+exports.getDriverToRate = async (req, res) => {
+  try {
+    const conductorId = req.user.id;
+    const sql = `
+      SELECT s.id, s.estado, s.pasajero_id, u.nombre as pasajero_nombre, u.reputacion_promedio, v.id as viaje_id, v.fecha_salida
+      FROM solicitudes s
+      JOIN viajes v ON s.viaje_id = v.id
+      JOIN usuarios u ON s.pasajero_id = u.id
+      LEFT JOIN evaluaciones e ON e.viaje_id = s.viaje_id AND e.evaluador_id = $1 AND e.evaluado_id = s.pasajero_id
+      WHERE v.conductor_id = $1 AND s.estado = 'ACEPTADO' AND v.estado = 'CERRADO' AND e.id IS NULL
+    `;
+    const result = await pool.query(sql, [conductorId]);
+    return res.status(200).json({ solicitudes: result.rows });
+  } catch (error) {
+    return res.status(500).json({ error: "Error recuperando solicitudes para calificar (conductor)." });
+  }
+};
+
+/**
  * RF6 Helper: Obtener Solicitudes Enviadas por el Pasajero
  */
 exports.getPassengerRequests = async (req, res) => {
@@ -156,7 +177,7 @@ exports.getPassengerRequests = async (req, res) => {
      const pasajeroId = req.user.id;
      const sql = `
        SELECT s.id, s.estado, s.creado_en,
-              v.fecha_salida, v.estado as estado_viaje,
+              v.id as viaje_id, v.fecha_salida, v.estado as estado_viaje, v.conductor_id,
               u.nombre as conductor_nombre, u.reputacion_promedio as conductor_reputacion, u.telefono as conductor_telefono
        FROM solicitudes s
        JOIN viajes v ON s.viaje_id = v.id
@@ -168,5 +189,78 @@ exports.getPassengerRequests = async (req, res) => {
      return res.status(200).json({ solicitudes: result.rows });
   } catch(error) {
      return res.status(500).json({ error: "Error recuperando las solicitudes del pasajero." });
+  }
+};
+
+/**
+ * Obtener solicitudes que debe calificar el pasajero: sus solicitudes ACEPTADO en viajes CERRADOS donde aún no ha calificado
+ */
+exports.getPassengerToRate = async (req, res) => {
+  try {
+    const pasajeroId = req.user.id;
+    const sql = `
+      SELECT s.id, s.estado, s.creado_en, v.id as viaje_id, v.fecha_salida, v.estado as estado_viaje,
+             v.conductor_id, u.nombre as conductor_nombre, u.reputacion_promedio as conductor_reputacion, u.telefono as conductor_telefono
+      FROM solicitudes s
+      JOIN viajes v ON s.viaje_id = v.id
+      JOIN usuarios u ON v.conductor_id = u.id
+      LEFT JOIN evaluaciones e ON e.viaje_id = s.viaje_id AND e.evaluador_id = $1 AND e.evaluado_id = v.conductor_id
+      WHERE s.pasajero_id = $1 AND s.estado = 'ACEPTADO' AND v.estado = 'CERRADO' AND e.id IS NULL
+      ORDER BY s.creado_en DESC
+    `;
+    const result = await pool.query(sql, [pasajeroId]);
+    console.log(`[getPassengerToRate] Pasajero ${pasajeroId} tiene ${result.rows.length} solicitudes para calificar`);
+    result.rows.forEach(row => {
+      console.log(`  - Viaje ${row.viaje_id}, Conductor ${row.conductor_id}, Estado ${row.estado}`);
+    });
+    return res.status(200).json({ solicitudes: result.rows });
+  } catch (error) {
+    console.error('[getPassengerToRate] Error:', error);
+    return res.status(500).json({ error: "Error recuperando solicitudes para calificar (pasajero)." });
+  }
+};
+
+/**
+ * Cancelar una solicitud (Pasajero) — si estaba ACEPTADO, devuelve el cupo.
+ */
+exports.cancelRequest = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const solicitudId = req.params.id;
+
+    await client.query('BEGIN');
+
+    const selSQL = 'SELECT id, viaje_id, pasajero_id, estado FROM solicitudes WHERE id = $1 FOR UPDATE';
+    const selRes = await client.query(selSQL, [solicitudId]);
+
+    if (selRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Solicitud no encontrada.' });
+    }
+
+    const sol = selRes.rows[0];
+
+    if (sol.pasajero_id !== req.user.id && req.user.rol !== 'ADMINISTRADOR') {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'Solo el pasajero puede cancelar su solicitud.' });
+    }
+
+    // Si ya fue aceptada, devolver cupo al viaje
+    if (sol.estado === 'ACEPTADO') {
+      await client.query('UPDATE viajes SET cupos_disponibles = cupos_disponibles + 1 WHERE id = $1', [sol.viaje_id]);
+      await client.query("INSERT INTO logs_eventos (usuario_id, tipo_evento, detalles) VALUES ($1, $2, $3)",
+        [req.user.id, 'CANCELACION_PASAJERO_RESTABLECE_CUPO', JSON.stringify({ viaje_id: sol.viaje_id, solicitud_id: solicitudId })]);
+    }
+
+    await client.query('DELETE FROM solicitudes WHERE id = $1', [solicitudId]);
+
+    await client.query('COMMIT');
+    return res.status(200).json({ message: 'Solicitud cancelada correctamente.' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error cancelando solicitud:', error);
+    return res.status(500).json({ error: 'No se pudo cancelar la solicitud.' });
+  } finally {
+    client.release();
   }
 };

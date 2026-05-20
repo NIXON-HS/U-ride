@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, ScrollView, Platform, StatusBar, Image
+  Alert, ActivityIndicator, ScrollView, Platform, StatusBar, Image, RefreshControl
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -28,6 +28,7 @@ export default function ProfileScreen() {
   const [direccion, setDireccion] = useState<string | null>(null);
   const [stats, setStats] = useState({ viajesConductor: 0, viajesPasajero: 0 });
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const API_URL = api.defaults.baseURL?.replace('/api', '') || 'http://192.168.1.119:3000';
 
@@ -73,38 +74,44 @@ export default function ProfileScreen() {
     }
   };
 
-  useEffect(() => {
-    api.get('/perfil')
-      .then(res => {
-        const p = res.data.perfil;
-        setCarrera(p.carrera || '');
-        setTelefono(p.telefono || '');
-        setRol(p.rol === 'CONDUCTOR' ? 'CONDUCTOR' : 'PASAJERO');
-        setFotoUrl(p.foto_url || null);
-        if (p.zona_lat && p.zona_lon) {
-          const lat = parseFloat(p.zona_lat);
-          const lon = parseFloat(p.zona_lon);
-          setLatitud(lat);
-          setLongitud(lon);
-          Location.reverseGeocodeAsync({ latitude: lat, longitude: lon })
-            .then(res => {
-              if (res[0]) {
-                const addr = res[0];
-                const calle = addr.street || addr.name || addr.district || 'Calle Desconocida';
-                const ciudad = addr.city || addr.subregion || addr.region || '';
-                setDireccion(`${calle}, ${ciudad}`);
-              }
-            })
-            .catch(() => {});
-        }
-        setReputacion(p.reputacion_promedio ? parseFloat(p.reputacion_promedio).toFixed(1) : '5.0');
-        setStats({
-          viajesConductor: parseInt(p.viajes_conductor) || 0,
-          viajesPasajero: parseInt(p.viajes_pasajero) || 0,
-        });
-      })
-      .catch(() => {});
-  }, []);
+  const fetchProfile = async () => {
+    setRefreshing(true);
+    try {
+      const res = await api.get('/perfil');
+      const p = res.data.perfil;
+      setCarrera(p.carrera || '');
+      setTelefono(p.telefono || '');
+      setRol(p.rol === 'CONDUCTOR' ? 'CONDUCTOR' : 'PASAJERO');
+      setFotoUrl(p.foto_url || null);
+      if (p.zona_lat && p.zona_lon) {
+        const lat = parseFloat(p.zona_lat);
+        const lon = parseFloat(p.zona_lon);
+        setLatitud(lat);
+        setLongitud(lon);
+        Location.reverseGeocodeAsync({ latitude: lat, longitude: lon })
+          .then(resgeo => {
+            if (resgeo[0]) {
+              const addr = resgeo[0];
+              const calle = addr.street || addr.name || addr.district || 'Calle Desconocida';
+              const ciudad = addr.city || addr.subregion || addr.region || '';
+              setDireccion(`${calle}, ${ciudad}`);
+            }
+          })
+          .catch(() => {});
+      }
+      setReputacion(p.reputacion_promedio ? parseFloat(p.reputacion_promedio).toFixed(1) : '5.0');
+      setStats({
+        viajesConductor: parseInt(p.viajes_conductor) || 0,
+        viajesPasajero: parseInt(p.viajes_pasajero) || 0,
+      });
+    } catch (err) {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => { fetchProfile(); }, []);
 
   const handleSave = async () => {
     setLoading(true);
@@ -147,7 +154,11 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchProfile} colors={[COLORS.primary]} />}
+      >
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.avatar} onPress={pickImage} activeOpacity={0.8}>

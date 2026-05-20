@@ -35,14 +35,47 @@ exports.createReview = async (req, res) => {
 
     await client.query('BEGIN'); // ★ Transacción ACID (Evaluación + Recálculo del AVG global)
 
-    // 3. Crear Reseña
+    // 3. Validar que el viaje exista y esté finalizado
+    const viajeRes = await client.query('SELECT id, conductor_id, estado FROM viajes WHERE id = $1 FOR UPDATE', [viaje_id]);
+    if (viajeRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'El viaje no existe.' });
+    }
+    const viaje = viajeRes.rows[0];
+    if (viaje.estado !== 'CERRADO') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'Solo se puede calificar tras finalizar el viaje.' });
+    }
+
+    // 4. Validar que el evaluador y evaluado participaron en el viaje
+    const isEvaluatorDriver = viaje.conductor_id === evaluadorId;
+    const isEvaluatorPassenger = !isEvaluatorDriver;
+
+    if (isEvaluatorPassenger) {
+      // evaluador debe tener una solicitud ACEPTADO en este viaje
+      const partRes = await client.query('SELECT id FROM solicitudes WHERE viaje_id = $1 AND pasajero_id = $2 AND estado = $3', [viaje_id, evaluadorId, 'ACEPTADO']);
+      if (partRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'No participaste como pasajero aceptado en este viaje.' });
+      }
+    } else {
+      // evaluador es conductor: el evaluado debe ser un pasajero ACEPTADO en este viaje
+      const partRes = await client.query('SELECT id FROM solicitudes WHERE viaje_id = $1 AND pasajero_id = $2 AND estado = $3', [viaje_id, evaluado_id, 'ACEPTADO']);
+      if (partRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'El usuario evaluado no participó como pasajero aceptado en este viaje.' });
+      }
+    }
+
+    // 5. Crear Reseña
     const insertSQL = `
       INSERT INTO evaluaciones (viaje_id, evaluador_id, evaluado_id, calificacion, comentario) 
       VALUES ($1, $2, $3, $4, $5) RETURNING id
     `;
-    await client.query(insertSQL, [viaje_id, evaluadorId, evaluado_id, calificacion, comentario]);
+    const insertRes = await client.query(insertSQL, [viaje_id, evaluadorId, evaluado_id, calificacion, comentario]);
+    console.log(`[createReview] Evaluación insertada: ID ${insertRes.rows[0].id}, Evaluador ${evaluadorId}, Evaluado ${evaluado_id}, Viaje ${viaje_id}`);
 
-    // 4. EL MOTOR DE REPUTACIÓN (BK-9)
+    // 6. EL MOTOR DE REPUTACIÓN (BK-9)
     // Intercepta todos los viajes del evaluado, promedio aritmético de sus estrellas y actualiza su placa base. 
     // Round limit to 2 decimals. Default 5.00 COALESCE si no hay datos.
     const engineSQL = `
@@ -56,6 +89,9 @@ exports.createReview = async (req, res) => {
       RETURNING reputacion_promedio
     `;
     const ratingResult = await client.query(engineSQL, [evaluado_id]);
+
+    // 7. Mantener la solicitud como ACEPTADO (no marcar para que ambos puedan calificar)
+    // La tabla evaluaciones registra quién ya calificó a quién
 
     await client.query('COMMIT'); // ★ FIN TRANSACCIÓN
 

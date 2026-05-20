@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, ScrollView, Platform, StatusBar, Modal, FlatList, Image
+  Alert, ActivityIndicator, ScrollView, Platform, StatusBar, Modal, FlatList, Image, RefreshControl
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,7 +32,9 @@ export default function ReportScreen() {
     setLoadingData(true);
     try {
       const res = await api.get('/viajes/historial/mios');
-      setViajes(res.data.viajes || []);
+      // Solo permitir reportar viajes finalizados
+      const all = res.data.viajes || [];
+      setViajes(all.filter((v: any) => v.estado === 'CERRADO'));
     } catch (err) {
       console.log(err);
     } finally {
@@ -118,7 +120,14 @@ export default function ReportScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={loadingData} onRefresh={fetchMisViajes} colors={[COLORS.primary]} />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Reportar Conducta</Text>
           <Text style={styles.headerSub}>Tu denuncia es confidencial</Text>
@@ -232,6 +241,8 @@ export default function ReportScreen() {
                 </TouchableOpacity>
               )}
               ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20, color: COLORS.gray }}>No tienes viajes en tu historial.</Text>}
+              refreshing={loadingData}
+              onRefresh={fetchMisViajes}
             />
           </View>
         </View>
@@ -260,6 +271,8 @@ export default function ReportScreen() {
                 </TouchableOpacity>
               )}
               ListEmptyComponent={<Text style={{ textAlign: 'center', marginTop: 20, color: COLORS.gray }}>No hay otros participantes en este viaje.</Text>}
+              refreshing={loadingData}
+              onRefresh={() => selectedViaje ? fetchParticipantes(selectedViaje.id) : null}
             />
           </View>
         </View>

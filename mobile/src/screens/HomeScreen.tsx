@@ -20,6 +20,8 @@ export default function HomeScreen({ navigation }: any) {
   const [radioKm, setRadioKm] = useState(3);
   const [filterDate, setFilterDate] = useState<Date | null>(null);
 
+  const isOwnRide = Boolean(selectedViaje && user?.id && selectedViaje.conductor_id === user.id);
+
   const fetchRides = async () => {
     setLoading(true);
     try {
@@ -40,6 +42,61 @@ export default function HomeScreen({ navigation }: any) {
   useEffect(() => { fetchRides(); }, []);
 
   const openModal = (viaje: any) => { setSelectedViaje(viaje); setModalVisible(true); };
+
+  const handleEditRide = () => {
+    if (!selectedViaje) return;
+    setModalVisible(false);
+    navigation.navigate('PublishRide', { viaje: selectedViaje });
+  };
+
+  const handleStartRide = async () => {
+    if (!selectedViaje) return;
+    try {
+      await api.patch(`/viajes/${selectedViaje.id}/iniciar`);
+      Alert.alert('Viaje iniciado', 'El estado cambió a EN_CURSO.');
+      setModalVisible(false);
+      fetchRides();
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.error || 'No se pudo iniciar el viaje.');
+    }
+  };
+
+  const handleFinishRide = async () => {
+    if (!selectedViaje) return;
+    try {
+      await api.patch(`/viajes/${selectedViaje.id}/finalizar`);
+      Alert.alert('Viaje finalizado', 'El estado cambió a CERRADO.');
+      setModalVisible(false);
+      fetchRides();
+    } catch (err: any) {
+      Alert.alert('Error', err.response?.data?.error || 'No se pudo finalizar el viaje.');
+    }
+  };
+
+  const handleDeleteRide = () => {
+    if (!selectedViaje) return;
+    Alert.alert(
+      'Eliminar viaje',
+      'Esta acción eliminará el viaje y las solicitudes asociadas.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/viajes/${selectedViaje.id}`);
+              Alert.alert('Viaje eliminado', 'La publicación fue borrada correctamente.');
+              setModalVisible(false);
+              fetchRides();
+            } catch (err: any) {
+              Alert.alert('Error', err.response?.data?.error || 'No se pudo eliminar el viaje.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleRequest = async () => {
     try {
@@ -128,9 +185,7 @@ export default function HomeScreen({ navigation }: any) {
               <Ionicons name="filter-outline" size={22} color={COLORS.primary} />
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.refreshBtn} onPress={fetchRides}>
-            <Ionicons name="refresh-outline" size={22} color={COLORS.primary} />
-          </TouchableOpacity>
+          {/* Pull-to-refresh will handle reloading; removed refresh button */}
         </View>
       </View>
 
@@ -143,6 +198,8 @@ export default function HomeScreen({ navigation }: any) {
           renderItem={({ item }) => <RideCard item={item} />}
           contentContainerStyle={{ padding: 16, paddingBottom: 20 }}
           showsVerticalScrollIndicator={false}
+          refreshing={loading}
+          onRefresh={fetchRides}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <Ionicons name="car-outline" size={64} color={COLORS.border} />
@@ -166,14 +223,58 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.modalSub}>
                 Lee las reglas de <Text style={{ fontFamily: FONTS.bold }}>{selectedViaje?.conductor}</Text> antes de unirte:
               </Text>
+              <View style={styles.tripSummary}>
+                <View style={styles.summaryRow}>
+                  <View style={styles.summaryPill}>
+                    <Ionicons name="people-outline" size={14} color={COLORS.primary} />
+                    <Text style={styles.summaryText}>{selectedViaje?.cupos_disponibles ?? 0} cupos</Text>
+                  </View>
+                  <View style={styles.summaryPill}>
+                    <Ionicons name="cash-outline" size={14} color={COLORS.secondary} />
+                    <Text style={styles.summaryText}>${selectedViaje?.costo_contribucion ?? 0}</Text>
+                  </View>
+                </View>
+                <Text style={styles.summaryDetail}>Origen: {selectedViaje?.origen_lat ?? '--'}, {selectedViaje?.origen_lon ?? '--'}</Text>
+                <Text style={styles.summaryDetail}>Destino: {selectedViaje?.destino_lat ?? '--'}, {selectedViaje?.destino_lon ?? '--'}</Text>
+                {selectedViaje?.estado && (
+                  <Text style={[styles.summaryDetail, { color: selectedViaje.estado === 'ACTIVO' ? COLORS.secondary : COLORS.danger }]}>
+                    Estado: {selectedViaje.estado}
+                  </Text>
+                )}
+              </View>
               <View style={styles.rulesBox}>
                 <Text style={styles.rulesText}>{selectedViaje?.notas_reglas}</Text>
               </View>
               <View style={styles.modalBtns}>
-                {user?.rol === 'CONDUCTOR' ? (
-                  <TouchableOpacity style={styles.acceptBtn} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.acceptText}>Cerrar Detalles</Text>
-                  </TouchableOpacity>
+                {isOwnRide ? (
+                  <View style={{ width: '100%' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                      <TouchableOpacity style={[styles.cancelBtn, { flex: 0.48, opacity: selectedViaje?.estado === 'ACTIVO' ? 1 : 0.5 }]} onPress={handleDeleteRide} disabled={selectedViaje?.estado !== 'ACTIVO'}>
+                        <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+                        <Text style={styles.cancelText}>Eliminar</Text>
+                      </TouchableOpacity>
+                      {selectedViaje?.estado === 'ACTIVO' ? (
+                        <TouchableOpacity style={[styles.acceptBtn, { flex: 0.48, marginLeft: 8 }]} onPress={handleStartRide}>
+                          <Ionicons name="play-circle-outline" size={18} color="#fff" />
+                          <Text style={styles.acceptText}>Iniciar</Text>
+                        </TouchableOpacity>
+                      ) : selectedViaje?.estado === 'EN_CURSO' ? (
+                        <TouchableOpacity style={[styles.acceptBtn, { flex: 0.48, marginLeft: 8, backgroundColor: COLORS.danger }]} onPress={handleFinishRide}>
+                          <Ionicons name="stop-circle-outline" size={18} color="#fff" />
+                          <Text style={styles.acceptText}>Finalizar</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity style={[styles.acceptBtn, { flex: 0.48, marginLeft: 8, opacity: 0.6 }]} disabled>
+                          <Ionicons name="play-circle-outline" size={18} color="#fff" />
+                          <Text style={styles.acceptText}>Iniciar</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    <TouchableOpacity style={[styles.editBtn, { opacity: selectedViaje?.estado === 'ACTIVO' ? 1 : 0.5 }]} onPress={handleEditRide} disabled={selectedViaje?.estado !== 'ACTIVO'}>
+                      <Ionicons name="create-outline" size={18} color="#fff" />
+                      <Text style={[styles.acceptText, { marginLeft: 10 }]}>Editar</Text>
+                    </TouchableOpacity>
+                  </View>
                 ) : (
                   <>
                     <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
@@ -280,6 +381,11 @@ const styles = StyleSheet.create({
   modalSub: { fontFamily: FONTS.regular, fontSize: 14, color: COLORS.gray, marginBottom: 16 },
   rulesBox: { backgroundColor: '#FFFBEB', padding: 16, borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#F59E0B', marginBottom: 24 },
   rulesText: { fontFamily: FONTS.medium, fontSize: 15, color: '#78350F', lineHeight: 22 },
+  tripSummary: { backgroundColor: '#F8FAFC', padding: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginBottom: 14, gap: 8 },
+  summaryRow: { flexDirection: 'row', gap: 8 },
+  summaryPill: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: RADIUS.full, backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.border },
+  summaryText: { fontFamily: FONTS.semiBold, fontSize: 12, color: COLORS.dark },
+  summaryDetail: { fontFamily: FONTS.regular, fontSize: 13, color: COLORS.gray },
   modalBtns: { flexDirection: 'row', gap: 10 },
   cancelBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14, borderRadius: RADIUS.md, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
   cancelText: { fontFamily: FONTS.bold, color: COLORS.danger },
@@ -292,4 +398,5 @@ const styles = StyleSheet.create({
   chipTextActive: { color: '#fff' },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: COLORS.surface, borderRadius: RADIUS.md, paddingHorizontal: 14, borderWidth: 1.5, borderColor: COLORS.border, marginBottom: 20 },
   inputDate: { flex: 1, paddingVertical: 12, fontFamily: FONTS.regular, fontSize: 15, color: COLORS.dark },
+  editBtn: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: RADIUS.md, backgroundColor: COLORS.secondary, marginTop: 12 },
 });

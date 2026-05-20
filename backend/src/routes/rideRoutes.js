@@ -13,6 +13,13 @@ router.get('/viajes', authMiddleware, rideController.searchRides);
 // Historial de viajes
 router.get('/viajes/historial/mios', authMiddleware, rideController.getMyTrips);
 
+// Detalle y gestión de un viaje
+router.get('/viajes/:id', authMiddleware, rideController.getRideById);
+router.put('/viajes/:id', authMiddleware, rideController.updateRide);
+router.delete('/viajes/:id', authMiddleware, rideController.deleteRide);
+router.patch('/viajes/:id/iniciar', authMiddleware, rideController.startRide);
+router.patch('/viajes/:id/finalizar', authMiddleware, rideController.finishRide);
+
 // Participantes de un viaje
 router.get('/viajes/:id/participantes', authMiddleware, rideController.getTripParticipants);
 
