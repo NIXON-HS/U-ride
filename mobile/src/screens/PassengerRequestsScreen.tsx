@@ -116,14 +116,24 @@ export default function PassengerRequestsScreen() {
           )}
         </View>
 
-        {(item.estado === 'ACEPTADO' || item.estado === 'CALIFICADO') && item.conductor_telefono && (
-          <TouchableOpacity style={styles.contactBtn} onPress={() => Linking.openURL(`tel:${item.conductor_telefono}`)}>
-            <Ionicons name="call" size={16} color="#fff" />
-            <Text style={styles.contactText}>Llamar al Conductor: {item.conductor_telefono}</Text>
-          </TouchableOpacity>
+        {(item.estado === 'ACEPTADO' || item.estado === 'CALIFICADO') && (
+          <View style={{ gap: 8 }}>
+            {!!item.conductor_telefono && (
+              <TouchableOpacity style={styles.contactBtn} onPress={() => Linking.openURL(`tel:${item.conductor_telefono}`)}>
+                <Ionicons name="call" size={16} color="#fff" />
+                <Text style={styles.contactText}>Llamar al Conductor: {item.conductor_telefono}</Text>
+              </TouchableOpacity>
+            )}
+            {item.estado === 'ACEPTADO' && item.estado_viaje === 'EN_CURSO' && (
+              <TouchableOpacity style={[styles.contactBtn, { backgroundColor: COLORS.primary }]} onPress={() => (nav as any).navigate('RideMap', { viajeId: item.viaje_id, rol: 'PASAJERO' })}>
+                <Ionicons name="map" size={16} color="#fff" />
+                <Text style={styles.contactText}>Ver Mapa de Trayecto</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
-        {item.estado === 'PENDIENTE' && (
+        {(item.estado === 'PENDIENTE' || (item.estado === 'ACEPTADO' && item.estado_viaje === 'ACTIVO')) && (
           <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#FEF2F2', marginTop: 10 }]} onPress={() => handleCancel(item.id)}>
             <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
             <Text style={[styles.contactText, { color: COLORS.danger, marginLeft: 8 }]}>Cancelar solicitud</Text>
@@ -197,8 +207,8 @@ export default function PassengerRequestsScreen() {
             ListEmptyComponent={
               <View style={styles.emptyBox}>
                 <Ionicons name="mail-open-outline" size={64} color={COLORS.border} />
-                <Text style={styles.emptyTitle}>Bandeja vacía</Text>
-                <Text style={styles.emptySub}>No hay solicitudes pendientes en este momento</Text>
+                <Text style={styles.emptyText}>Bandeja vacía</Text>
+                <Text style={styles.emptySubText}>No hay solicitudes pendientes en este momento</Text>
               </View>
             }
           />
@@ -217,7 +227,7 @@ export default function PassengerRequestsScreen() {
                       <View style={[styles.pendingBadge, { backgroundColor: '#ECFDF5' }]}><Text style={[styles.pendingText, { color: COLORS.secondary }]}>Cerrado</Text></View>
                     </View>
                     <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-                      <TouchableOpacity style={[styles.acceptBtn, { paddingHorizontal: 18 }]} onPress={() => nav.navigate('Rate', { viaje_id: item.viaje_id, evaluado_id: item.conductor_id, nombre_evaluado: item.conductor_nombre, onRated: fetchInbox })}>
+                      <TouchableOpacity style={[styles.acceptBtn, { paddingHorizontal: 18 }]} onPress={() => (nav as any).navigate('Rate', { viaje_id: item.viaje_id, evaluado_id: item.conductor_id, nombre_evaluado: item.conductor_nombre, onRated: fetchInbox })}>
                         <Ionicons name="star" size={16} color="#fff" />
                         <Text style={[styles.acceptText, { marginLeft: 8 }]}>Calificar</Text>
                       </TouchableOpacity>

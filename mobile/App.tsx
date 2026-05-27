@@ -20,6 +20,8 @@ import DriverScreen from './src/screens/DriverScreen';
 import ReportScreen from './src/screens/ReportScreen';
 import RateScreen from './src/screens/RateScreen';
 import PassengerRequestsScreen from './src/screens/PassengerRequestsScreen';
+import PaymentScreen from './src/screens/PaymentScreen';
+import RideMapScreen from './src/screens/RideMapScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -47,6 +49,8 @@ function PasajeroTabs() {
         options={{ title: 'Viajes', tabBarIcon: ({ color, size }) => <Ionicons name="car-sport-outline" size={size} color={color} /> }} />
       <Tab.Screen name="Requests" component={PassengerRequestsScreen}
         options={{ title: 'Solicitudes', tabBarIcon: ({ color, size }) => <Ionicons name="mail-unread-outline" size={size} color={color} /> }} />
+      <Tab.Screen name="Payments" component={PaymentScreen}
+        options={{ title: 'Pagos', tabBarIcon: ({ color, size }) => <Ionicons name="card-outline" size={size} color={color} /> }} />
       <Tab.Screen name="Report" component={ReportScreen}
         options={{ title: 'Reportar', tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" size={size} color={color} /> }} />
       <Tab.Screen name="Profile" component={ProfileScreen}
@@ -71,6 +75,8 @@ function ConductorTabs() {
       />
       <Tab.Screen name="Driver" component={DriverScreen}
         options={{ title: 'Solicitudes', tabBarIcon: ({ color, size }) => <Ionicons name="mail-unread-outline" size={size} color={color} /> }} />
+      <Tab.Screen name="Payments" component={PaymentScreen}
+        options={{ title: 'Pagos', tabBarIcon: ({ color, size }) => <Ionicons name="card-outline" size={size} color={color} /> }} />
       <Tab.Screen name="Report" component={ReportScreen}
         options={{ title: 'Reportar', tabBarIcon: ({ color, size }) => <Ionicons name="flag-outline" size={size} color={color} /> }} />
       <Tab.Screen name="Profile" component={ProfileScreen}
@@ -122,6 +128,7 @@ export default function App() {
                 {() => <RoleBasedTabs rol={user?.rol ?? 'PASAJERO'} />}
               </Stack.Screen>
               <Stack.Screen name="Rate" component={RateScreen} options={{ presentation: 'modal' }} />
+              <Stack.Screen name="RideMap" component={RideMapScreen} />
             </Stack.Group>
           )}
         </Stack.Navigator>

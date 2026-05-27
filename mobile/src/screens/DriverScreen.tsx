@@ -163,7 +163,7 @@ export default function DriverScreen() {
                   </View>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-                  <TouchableOpacity style={[styles.acceptBtn, { paddingHorizontal: 18 }]} onPress={() => navigation.navigate('Rate', { viaje_id: item.viaje_id, evaluado_id: item.pasajero_id, nombre_evaluado: item.pasajero_nombre, onRated: fetchInbox })}>
+                  <TouchableOpacity style={[styles.acceptBtn, { paddingHorizontal: 18 }]} onPress={() => (navigation as any).navigate('Rate', { viaje_id: item.viaje_id, evaluado_id: item.pasajero_id, nombre_evaluado: item.pasajero_nombre, onRated: fetchInbox })}>
                     <Ionicons name="star" size={16} color="#fff" />
                     <Text style={[styles.acceptText, { marginLeft: 8 }]}>Calificar</Text>
                   </TouchableOpacity>

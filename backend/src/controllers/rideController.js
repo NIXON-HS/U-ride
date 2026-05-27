@@ -133,18 +133,19 @@ exports.searchRides = async (req, res) => {
       SELECT v.id, v.fecha_salida, v.cupos_disponibles, v.notas_reglas, v.costo_contribucion,
              u.nombre as conductor, u.reputacion_promedio as reputacion_conductor,
              v.origen_lat, v.origen_lon,
-             (6371000 * acos(cos(radians($1)) * cos(radians(v.origen_lat)) * cos(radians(v.origen_lon) - radians($2)) + sin(radians($1)) * sin(radians(v.origen_lat)))) as metros_de_distancia
+             (6371000 * acos(cos(radians($1)) * cos(radians(v.origen_lat)) * cos(radians(v.origen_lon) - radians($2)) + sin(radians($1)) * sin(radians(v.origen_lat)))) as metros_de_distancia,
+             EXISTS(SELECT 1 FROM solicitudes s WHERE s.viaje_id = v.id AND s.pasajero_id = $4) as ya_solicitado
       FROM viajes v
       INNER JOIN usuarios u ON v.conductor_id = u.id
       WHERE v.estado = 'ACTIVO' AND v.cupos_disponibles > 0
         AND (6371000 * acos(cos(radians($1)) * cos(radians(v.origen_lat)) * cos(radians(v.origen_lon) - radians($2)) + sin(radians($1)) * sin(radians(v.origen_lat)))) <= $3
     `;
 
-    const values = [lat, lon, radioMetros];
+    const values = [lat, lon, radioMetros, req.user.id];
 
     // Si filtraron por Fecha
     if (fecha) {
-      baseQuery += ` AND DATE(v.fecha_salida) = DATE($4)`;
+      baseQuery += ` AND DATE(v.fecha_salida) = DATE($5)`;
       values.push(fecha);
     }
 
@@ -215,6 +216,7 @@ exports.getRideById = async (req, res) => {
 
     const query = `
       SELECT v.id, v.conductor_id, v.fecha_salida, v.origen_lat, v.origen_lon, v.destino_lat, v.destino_lon,
+             v.driver_lat, v.driver_lon,
              v.cupos_disponibles, v.notas_reglas, v.costo_contribucion, v.estado,
              u.nombre as conductor, u.reputacion_promedio as reputacion_conductor
       FROM viajes v
@@ -338,6 +340,8 @@ exports.updateRide = async (req, res) => {
 exports.startRide = async (req, res) => {
   try {
     const viajeId = req.params.id;
+    const { ignorarPago } = req.body;
+
     const tripRes = await pool.query('SELECT conductor_id, estado FROM viajes WHERE id = $1', [viajeId]);
     const viaje = tripRes.rows[0];
 
@@ -351,6 +355,23 @@ exports.startRide = async (req, res) => {
 
     if (viaje.estado !== 'ACTIVO') {
       return res.status(409).json({ error: 'Solo puedes iniciar un viaje activo.' });
+    }
+
+    // Si no se indica forzar el inicio ignorando el pago, validar deudores
+    if (!ignorarPago) {
+      const unpaidRes = await pool.query(
+        `SELECT u.nombre 
+         FROM solicitudes s
+         JOIN usuarios u ON s.pasajero_id = u.id
+         WHERE s.viaje_id = $1 AND s.estado = 'ACEPTADO' AND s.pago_estado != 'COMPLETADO'`,
+        [viajeId]
+      );
+      if (unpaidRes.rowCount > 0) {
+        return res.status(200).json({
+          requiereConfirmacionPago: true,
+          pasajerosSinPago: unpaidRes.rows.map(r => r.nombre)
+        });
+      }
     }
 
     const result = await pool.query(
@@ -476,6 +497,49 @@ exports.finishRide = async (req, res) => {
   } catch (error) {
     console.error('Error finalizando viaje:', error);
     return res.status(500).json({ error: 'No se pudo finalizar el viaje.' });
+  }
+};
+
+/**
+ * Actualizar ubicación actual del conductor (GPS Tracking)
+ */
+exports.updateRideLocation = async (req, res) => {
+  try {
+    const viajeId = req.params.id;
+    const { latitud, longitud } = req.body;
+
+    if (latitud === undefined || longitud === undefined) {
+      return res.status(400).json({ error: 'Latitud y longitud son requeridas.' });
+    }
+
+    // Verificar que el viaje existe y el usuario es el conductor
+    const tripRes = await pool.query('SELECT conductor_id, estado FROM viajes WHERE id = $1', [viajeId]);
+    const viaje = tripRes.rows[0];
+
+    if (!viaje) {
+      return res.status(404).json({ error: 'El viaje no existe.' });
+    }
+
+    if (viaje.conductor_id !== req.user.id && req.user.rol !== 'ADMINISTRADOR') {
+      return res.status(403).json({ error: 'Solo el conductor del viaje puede reportar ubicación.' });
+    }
+
+    if (viaje.estado !== 'EN_CURSO') {
+      return res.status(409).json({ error: 'Solo puedes reportar ubicación en un viaje que esté en curso.' });
+    }
+
+    await pool.query(
+      `UPDATE viajes
+       SET driver_lat = $1, driver_lon = $2
+       WHERE id = $3`,
+      [latitud, longitud, viajeId]
+    );
+
+    return res.status(200).json({ message: 'Ubicación de trayecto actualizada.' });
+
+  } catch (error) {
+    console.error('Error actualizando ubicación GPS del viaje:', error);
+    return res.status(500).json({ error: 'No se pudo actualizar la ubicación del viaje.' });
   }
 };
 

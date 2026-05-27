@@ -19,6 +19,7 @@ router.put('/viajes/:id', authMiddleware, rideController.updateRide);
 router.delete('/viajes/:id', authMiddleware, rideController.deleteRide);
 router.patch('/viajes/:id/iniciar', authMiddleware, rideController.startRide);
 router.patch('/viajes/:id/finalizar', authMiddleware, rideController.finishRide);
+router.put('/viajes/:id/ubicacion', authMiddleware, rideController.updateRideLocation);
 
 // Participantes de un viaje
 router.get('/viajes/:id/participantes', authMiddleware, rideController.getTripParticipants);

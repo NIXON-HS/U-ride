@@ -176,8 +176,8 @@ exports.getPassengerRequests = async (req, res) => {
   try {
      const pasajeroId = req.user.id;
      const sql = `
-       SELECT s.id, s.estado, s.creado_en,
-              v.id as viaje_id, v.fecha_salida, v.estado as estado_viaje, v.conductor_id,
+       SELECT s.id, s.estado, s.creado_en, s.metodo_pago, s.pago_estado, s.monto_pagado,
+              v.id as viaje_id, v.fecha_salida, v.estado as estado_viaje, v.conductor_id, v.costo_contribucion,
               u.nombre as conductor_nombre, u.reputacion_promedio as conductor_reputacion, u.telefono as conductor_telefono
        FROM solicitudes s
        JOIN viajes v ON s.viaje_id = v.id
@@ -230,7 +230,12 @@ exports.cancelRequest = async (req, res) => {
 
     await client.query('BEGIN');
 
-    const selSQL = 'SELECT id, viaje_id, pasajero_id, estado FROM solicitudes WHERE id = $1 FOR UPDATE';
+    const selSQL = `
+      SELECT s.id, s.viaje_id, s.pasajero_id, s.estado, v.estado as viaje_estado 
+      FROM solicitudes s
+      JOIN viajes v ON s.viaje_id = v.id
+      WHERE s.id = $1 FOR UPDATE
+    `;
     const selRes = await client.query(selSQL, [solicitudId]);
 
     if (selRes.rows.length === 0) {
@@ -243,6 +248,12 @@ exports.cancelRequest = async (req, res) => {
     if (sol.pasajero_id !== req.user.id && req.user.rol !== 'ADMINISTRADOR') {
       await client.query('ROLLBACK');
       return res.status(403).json({ error: 'Solo el pasajero puede cancelar su solicitud.' });
+    }
+
+    // Regla de Negocio: No se puede cancelar si el viaje ya inició o finalizó
+    if (sol.viaje_estado === 'EN_CURSO' || sol.viaje_estado === 'CERRADO') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'No puedes cancelar la solicitud porque el viaje ya ha iniciado.' });
     }
 
     // Si ya fue aceptada, devolver cupo al viaje

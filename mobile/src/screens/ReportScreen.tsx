@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
 import { COLORS, FONTS, RADIUS, SHADOW } from '../theme/design';
 
-export default function ReportScreen() {
+export default function ReportScreen({ route, navigation }: any) {
   const [viajes, setViajes] = useState<any[]>([]);
   const [participantes, setParticipantes] = useState<any[]>([]);
   
@@ -28,13 +28,30 @@ export default function ReportScreen() {
     fetchMisViajes();
   }, []);
 
+  useEffect(() => {
+    const viajeIdParam = route?.params?.viajeId;
+    if (viajeIdParam) {
+      const loadPreselectedTrip = async () => {
+        try {
+          const resp = await api.get(`/viajes/${viajeIdParam}`);
+          const v = resp.data.viaje;
+          setSelectedViaje(v);
+          fetchParticipantes(viajeIdParam);
+        } catch (err) {
+          console.log('Error loading preselected trip:', err);
+        }
+      };
+      loadPreselectedTrip();
+    }
+  }, [route?.params?.viajeId]);
+
   const fetchMisViajes = async () => {
     setLoadingData(true);
     try {
       const res = await api.get('/viajes/historial/mios');
-      // Solo permitir reportar viajes finalizados
+      // Permitir reportar viajes en curso y finalizados/cerrados
       const all = res.data.viajes || [];
-      setViajes(all.filter((v: any) => v.estado === 'CERRADO'));
+      setViajes(all.filter((v: any) => v.estado === 'CERRADO' || v.estado === 'EN_CURSO'));
     } catch (err) {
       console.log(err);
     } finally {

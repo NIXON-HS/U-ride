@@ -49,10 +49,28 @@ export default function HomeScreen({ navigation }: any) {
     navigation.navigate('PublishRide', { viaje: selectedViaje });
   };
 
-  const handleStartRide = async () => {
+  const handleStartRide = async (ignorarPago = false) => {
     if (!selectedViaje) return;
     try {
-      await api.patch(`/viajes/${selectedViaje.id}/iniciar`);
+      const resp = await api.patch(`/viajes/${selectedViaje.id}/iniciar`, { ignorarPago });
+      
+      if (resp.data.requiereConfirmacionPago) {
+        const nombres = resp.data.pasajerosSinPago.join('\n- ');
+        Alert.alert(
+          'Pasajeros sin pago ⚠️',
+          `Los siguientes pasajeros aún no han realizado su aporte:\n\n- ${nombres}\n\n¿Deseas iniciar el viaje de todas formas?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+              text: 'Sí, iniciar viaje', 
+              style: 'destructive',
+              onPress: () => handleStartRide(true) 
+            }
+          ]
+        );
+        return;
+      }
+
       Alert.alert('Viaje iniciado', 'El estado cambió a EN_CURSO.');
       setModalVisible(false);
       fetchRides();
@@ -160,12 +178,19 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         )}
       </View>
-      <View style={styles.joinBtn}>
-        <Ionicons name={user?.rol === 'CONDUCTOR' ? "information-circle-outline" : "add-circle-outline"} size={16} color="#fff" />
-        <Text style={styles.joinBtnText}>
-          {user?.rol === 'CONDUCTOR' ? 'Ver detalles' : 'Ver reglas y unirse'}
-        </Text>
-      </View>
+      {item.ya_solicitado ? (
+        <View style={[styles.joinBtn, { backgroundColor: COLORS.lightGray }]}>
+          <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
+          <Text style={styles.joinBtnText}>Solicitud Enviada</Text>
+        </View>
+      ) : (
+        <View style={styles.joinBtn}>
+          <Ionicons name={user?.rol === 'CONDUCTOR' ? "information-circle-outline" : "add-circle-outline"} size={16} color="#fff" />
+          <Text style={styles.joinBtnText}>
+            {user?.rol === 'CONDUCTOR' ? 'Ver detalles' : 'Ver reglas y unirse'}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 
@@ -254,7 +279,7 @@ export default function HomeScreen({ navigation }: any) {
                         <Text style={styles.cancelText}>Eliminar</Text>
                       </TouchableOpacity>
                       {selectedViaje?.estado === 'ACTIVO' ? (
-                        <TouchableOpacity style={[styles.acceptBtn, { flex: 0.48, marginLeft: 8 }]} onPress={handleStartRide}>
+                        <TouchableOpacity style={[styles.acceptBtn, { flex: 0.48, marginLeft: 8 }]} onPress={() => handleStartRide(false)}>
                           <Ionicons name="play-circle-outline" size={18} color="#fff" />
                           <Text style={styles.acceptText}>Iniciar</Text>
                         </TouchableOpacity>
@@ -270,21 +295,35 @@ export default function HomeScreen({ navigation }: any) {
                         </TouchableOpacity>
                       )}
                     </View>
-                    <TouchableOpacity style={[styles.editBtn, { opacity: selectedViaje?.estado === 'ACTIVO' ? 1 : 0.5 }]} onPress={handleEditRide} disabled={selectedViaje?.estado !== 'ACTIVO'}>
-                      <Ionicons name="create-outline" size={18} color="#fff" />
-                      <Text style={[styles.acceptText, { marginLeft: 10 }]}>Editar</Text>
-                    </TouchableOpacity>
+                    {selectedViaje?.estado === 'EN_CURSO' ? (
+                      <TouchableOpacity style={[styles.editBtn, { backgroundColor: COLORS.primary }]} onPress={() => { setModalVisible(false); navigation.navigate('RideMap', { viajeId: selectedViaje.id, rol: 'CONDUCTOR' }); }}>
+                        <Ionicons name="map-outline" size={18} color="#fff" />
+                        <Text style={[styles.acceptText, { marginLeft: 10 }]}>Ver Mapa de Trayecto</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={[styles.editBtn, { opacity: selectedViaje?.estado === 'ACTIVO' ? 1 : 0.5 }]} onPress={handleEditRide} disabled={selectedViaje?.estado !== 'ACTIVO'}>
+                        <Ionicons name="create-outline" size={18} color="#fff" />
+                        <Text style={[styles.acceptText, { marginLeft: 10 }]}>Editar</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 ) : (
                   <>
                     <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                       <Ionicons name="close-circle-outline" size={18} color={COLORS.danger} />
-                      <Text style={styles.cancelText}>Rechazar</Text>
+                      <Text style={styles.cancelText}>{selectedViaje?.ya_solicitado ? 'Cerrar' : 'Rechazar'}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.acceptBtn} onPress={handleRequest}>
-                      <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                      <Text style={styles.acceptText}>Aceptar y Unirse</Text>
-                    </TouchableOpacity>
+                    {selectedViaje?.ya_solicitado ? (
+                      <TouchableOpacity style={[styles.acceptBtn, { backgroundColor: COLORS.lightGray }]} disabled>
+                        <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                        <Text style={styles.acceptText}>Solicitud Enviada</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={styles.acceptBtn} onPress={handleRequest}>
+                        <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                        <Text style={styles.acceptText}>Aceptar y Unirse</Text>
+                      </TouchableOpacity>
+                    )}
                   </>
                 )}
               </View>
