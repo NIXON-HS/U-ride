@@ -30,7 +30,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const API_URL = api.defaults.baseURL?.replace('/api', '') || 'http://192.168.1.119:3000';
+  const API_URL = api.defaults.baseURL?.replace('/api', '') || 'http://192.168.7.169:5000';
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
